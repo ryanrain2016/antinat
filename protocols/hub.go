@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+
+	"github.com/pkg/errors"
 )
 
 type MessageHandler interface {
@@ -15,6 +17,7 @@ type MessageHandler interface {
 
 type Handler struct {
 	conn net.Conn
+	loop bool
 }
 
 func (h *Handler) Handle(mh MessageHandler) {
@@ -27,21 +30,29 @@ func (h *Handler) Handle(mh MessageHandler) {
 	defer func() {
 		mh.Close()
 	}()
-	var err error
-	for {
-		buf := make([]byte, 2)
-		if _, err = io.ReadFull(h.conn, buf); err != nil {
-			break
-		}
-		size := (int(buf[0]) << 8) + int(buf[1])
-		buf = make([]byte, size)
-		if _, err = io.ReadFull(h.conn, buf); err != nil {
-			break
+	for h.loop {
+		buf, err := h.ReadOneMessage()
+		if err != nil {
+			log.Error("read message error: %s", err.Error())
+			return
 		}
 		if err = mh.OnMessage(buf); err != nil {
 			log.Error("handle message error: %s", err.Error())
 		}
 	}
+}
+
+func (h *Handler) ReadOneMessage() (buf []byte, err error) {
+	buf = make([]byte, 2)
+	if _, err = io.ReadFull(h.conn, buf); err != nil {
+		return
+	}
+	size := (int(buf[0]) << 8) + int(buf[1])
+	buf = make([]byte, size)
+	if _, err = io.ReadFull(h.conn, buf); err != nil {
+		return
+	}
+	return buf, nil
 }
 
 func (h *Handler) Write(data []byte) error {
@@ -59,6 +70,7 @@ type HubProtocol struct {
 	listeners []net.Listener
 	cfg       *config.Config
 	hub       *Hub
+	usernames []string
 }
 
 func NewHubProtocol(conn net.Conn, cfg *config.Config, hub *Hub) *HubProtocol {
@@ -67,6 +79,8 @@ func NewHubProtocol(conn net.Conn, cfg *config.Config, hub *Hub) *HubProtocol {
 	hp.listeners = make([]net.Listener, 0)
 	hp.cfg = cfg
 	hp.hub = hub
+	hp.loop = true
+	hp.usernames = make([]string, 0)
 	return hp
 }
 
@@ -79,6 +93,9 @@ func (hp *HubProtocol) Close() error {
 	errors = append(errors, hp.conn.Close())
 	for _, l := range hp.listeners {
 		errors = append(errors, l.Close())
+	}
+	for _, v := range hp.usernames {
+		hp.hub.Gm.Pop(v)
 	}
 	for _, err := range errors {
 		if err != nil {
@@ -116,17 +133,43 @@ func (hp *HubProtocol) onRegister(data []byte) error {
 	passLen := int(data[1+usernameLen])
 	password := string(data[2+usernameLen : 2+usernameLen+passLen])
 	buf := []byte{0x12}
+	hp.usernames = append(hp.usernames, username)
+	hp.hub.Gm.Put(username, hp)
 	if hp.cfg.CheckUser(username, password) {
 		hp.hub.Gm.Put(username, hp.conn.RemoteAddr().String())
-		buf = append(buf, 1)
+		buf = append(buf, 1) // 1 success
 	} else {
-		buf = append(buf, 0)
+		buf = append(buf, 0) // 0 failed
 	}
 	return hp.Write(buf)
 }
 
 func (hp *HubProtocol) onConnection(data []byte) (err error) {
-
+	defer func() { hp.loop = false }() // 新建的连接请求的连接，不走消息循环
+	usernameLen := int(data[0])
+	username := string(data[1 : 1+usernameLen])
+	passLen := int(data[1+usernameLen])
+	password := string(data[2+usernameLen : 2+usernameLen+passLen])
+	if !hp.cfg.CheckUser(username, password) {
+		hp.Write([]byte("\x13\x00"))
+		return errors.WithStack(errors.New("connection auth failed"))
+	}
+	nodeLen := int(data[2+usernameLen+passLen])
+	node := string(data[3+usernameLen+passLen : 3+usernameLen+passLen+nodeLen])
+	portBytes := data[3+usernameLen+passLen+nodeLen : 5+usernameLen+passLen+nodeLen]
+	rport := (int(portBytes[0]) << 8) + int(portBytes[1])
+	log.Info("<%s> connection from <%s> to <%s>:<%d>",
+		hp.cfg.GetInstanceName(),
+		hp.conn.RemoteAddr().String(),
+		node,
+		rport,
+	)
+	remoteHp := hp.hub.Gm.Get(node).(*HubProtocol)
+	key := hp.hub.Gm.PutWithRandomKey(hp)
+	buf := append([]byte{0x03}, []byte(key)...) // request connect
+	// TODO 添加连接请求方的地址, node收到后要向该地址发送若干udp包打洞
+	buf = append(buf, portBytes...)
+	remoteHp.Write(buf)
 	return nil
 }
 

@@ -3,6 +3,7 @@ package protocols
 import (
 	"antinat/config"
 	"antinat/log"
+	"antinat/utils"
 	"fmt"
 	"net"
 )
@@ -34,6 +35,21 @@ func (gm *GlobalMap) Put(key string, i interface{}) {
 		<-gm.lock
 	}()
 	gm.inner[key] = i
+}
+
+func (gm *GlobalMap) PutWithRandomKey(i interface{}) (key string) {
+	gm.lock <- 1
+	defer func() {
+		<-gm.lock
+	}()
+	for {
+		key = utils.RandomString(10)
+		if _, ok := gm.inner[key]; !ok {
+			break
+		}
+	}
+	gm.inner[key] = i
+	return
 }
 
 func (gm *GlobalMap) Get(key string) interface{} {

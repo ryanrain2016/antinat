@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -14,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Unknwon/goconfig"
+	"github.com/pkg/errors"
 	"github.com/xtaci/kcp-go"
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -262,6 +262,40 @@ func (cfg *Config) GetKcpConfig() *KcpConfig {
 	return cfg.kc
 }
 
+func (cfg *Config) CreateKcpConnection(raddr string, laddr net.Addr) (conn net.Conn, err error) {
+	kc := cfg.getKcpConfig()
+	if kc == nil {
+		return nil, fmt.Errorf("[%s.kcp] config not right", cfg.instanceName)
+	}
+	addr := laddr.(*net.UDPAddr)
+	udp, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return nil, err
+	}
+	if block := kc.GetEncryptBlock(); block != nil {
+		return kcp.NewConn2(addr, block, 10, 3, udp)
+	} else {
+		return kcp.NewConn2(addr, nil, 0, 0, udp)
+	}
+}
+
+func (cfg *Config) createKcpListener(laddr net.Addr) (listener net.Listener, err error) {
+	kc := cfg.getKcpConfig()
+	if kc == nil {
+		return nil, fmt.Errorf("[%s.kcp] config not right", cfg.instanceName)
+	}
+	addr := laddr.(*net.UDPAddr)
+	udp, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return nil, err
+	}
+	if block := kc.GetEncryptBlock(); block != nil {
+		return kcp.ServeConn(block, 10, 3, udp)
+	} else {
+		return kcp.ServeConn(nil, 0, 0, udp)
+	}
+}
+
 func (cfg *Config) CreateConnectionToHub() (udp *net.UDPConn, conn net.Conn, err error) {
 	var role string
 	if role, _ = cfg.GetRole(); role != "node" {
@@ -270,10 +304,7 @@ func (cfg *Config) CreateConnectionToHub() (udp *net.UDPConn, conn net.Conn, err
 	server_addr, _ := cfg.GetHubAddr()
 	tlsConfig := cfg.GetTlsConfig()
 	kc := cfg.getKcpConfig()
-	if kc == nil {
-		// conn, err = net.Dial("tcp", server_addr)
-		return nil, nil, fmt.Errorf("[%s.kcp] config not right", cfg.instanceName)
-	}
+
 	udpaddr, err := net.ResolveUDPAddr("udp", server_addr)
 	if err != nil {
 		return nil, nil, err

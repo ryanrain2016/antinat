@@ -7,20 +7,18 @@ import (
 )
 
 type Node struct {
-	cfg     *config.Config
-	udpConn *net.UDPConn
-	conn    net.Conn
-	Gm      *GlobalMap
+	cfg  *config.Config
+	conn net.Conn
+	Gm   *GlobalMap
 }
 
 func NewNode(cfg *config.Config) (n *Node, err error) {
 	n = new(Node)
 	n.cfg = cfg
-	udpConn, conn, err := cfg.CreateConnectionToHub()
+	_, conn, err := cfg.CreateConnectionToHub()
 	if err != nil {
 		return nil, err
 	}
-	n.udpConn = udpConn
 	n.conn = conn
 	n.Gm = &GlobalMap{
 		lock:  make(chan int, 1),

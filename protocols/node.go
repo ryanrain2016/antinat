@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
 type NodeProtocol struct {
@@ -27,6 +29,7 @@ func NewNodeProtocol(conn net.Conn, cfg *config.Config, node *Node) *NodeProtoco
 	np.heartbeatTicker = time.NewTicker(time.Second * 30)
 	np.heartbeatStop = make(chan int)
 	np.node = node
+	np.loop = true
 	return np
 }
 
@@ -53,8 +56,8 @@ func (np *NodeProtocol) OnMessage(msg []byte) error {
 		return np.onRegisterResponse(msg[1:])
 	case 0x03: // 连接请求包
 		return np.onConnection(msg[1:])
-	case 0x13: // 连接请求响应包
-		return np.onConnectionResponse(msg[1:])
+	// case 0x13: // 连接请求响应包
+	// 	return np.onConnectionResponse(msg[1:])
 	case 0x0a: // 控制台消息
 		return np.onControl(msg[1:])
 	default:
@@ -71,11 +74,16 @@ func (np *NodeProtocol) onRegisterResponse(buf []byte) error {
 }
 
 func (np *NodeProtocol) onConnection(buf []byte) (err error) {
+	// create a new connection to hub, to make hole to request addr
+
 	return nil
 }
 
-func (np *NodeProtocol) onConnectionResponse(buf []byte) (err error) {
-	return nil
+func (np *NodeProtocol) onConnectionResponse(buf []byte) (raddr string, err error) {
+	if buf[0] != 1 {
+		return "", errors.WithStack(errors.New("connection error"))
+	}
+	return "", nil
 }
 
 func (np *NodeProtocol) onControl(data []byte) (err error) {
@@ -120,4 +128,37 @@ func (np *NodeProtocol) StartHeartBeat() {
 func (np *NodeProtocol) StopHeartBeat() {
 	np.heartbeatStop <- 1
 	np.heartbeatTicker.Stop()
+}
+
+func (np *NodeProtocol) Connect(nodeName string, port int) (net.Conn, error) {
+	_, conn, err := np.cfg.CreateConnectionToHub()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	defer func() { conn.Close() }()
+	np1 := NewNodeProtocol(conn, np.cfg, np.node)
+	auth := np.cfg.GetAuth() // if auth is nil, panic occurs when register
+	authBytes := auth.ToBytes()
+	connBytes := append([]byte{0x03}, authBytes...)
+	connBytes = append(connBytes, byte(len(nodeName)))
+	connBytes = append(connBytes, []byte(nodeName)...)
+	connBytes = append(connBytes, byte((port&0xff00)>>8), byte(port&0xff))
+	if err = np1.Write(connBytes); err != nil {
+		return nil, errors.WithStack(err)
+	}
+	buf, err := np1.ReadOneMessage()
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	if buf[0] != 0x13 {
+		return nil, errors.WithStack(errors.New("expect connection response unexpect connection"))
+	}
+	raddr, err := np1.onConnectionResponse(buf[1:])
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	laddr := conn.LocalAddr()
+	conn.Close()
+	conn, err = np1.cfg.CreateKcpConnection(raddr, laddr)
+	return conn, err
 }
