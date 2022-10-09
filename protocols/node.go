@@ -117,7 +117,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
-	log.Debug("connect to local<%s> done", lAddr)
+	log.Debug("connect to local<%s> done, start to make hole to %s", lAddr, raddr)
 	for i := 0; i <= 10; i++ { // make hole
 		udp.WriteToUDP([]byte("\x0f\xff"), raddr)
 	}
@@ -125,6 +125,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	np1 := NewNodeProtocol(conn, np.cfg, np.node)
 	log.Debug("node write a success connection response")
 	np1.Write(connectResponseBytes)
+	log.Debug("node write response done")
 	np1.Close()
 	go func() {
 		defer func() {

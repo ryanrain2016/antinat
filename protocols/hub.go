@@ -193,9 +193,11 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 	// data[1:11] key
 	// if success; get hp.conn.RemoteAddr send to request node
 	// else send failed to request node
+	log.Debug("hub read a conncetion response")
 	key := string(data[1:11])
 	hp1, ok := hp.hub.Gm.Pop(key).(*HubProtocol)
 	if !ok || hp1 == nil {
+		log.Error("hub read connection response error, invalid key")
 		return errors.WithStack(errors.New("invalid connection response"))
 	}
 	defer hp1.Close()
@@ -204,11 +206,13 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 		log.Debug("connect failed")
 		return nil
 	}
+	log.Debug("hub read a success connection response")
 	buf := []byte{0x13, 0x01}
 	remoteAddr, _ := hp.conn.RemoteAddr().(*net.UDPAddr)
 	ipBytes, _ := utils.IP2Bytes(remoteAddr.IP)
 	buf = append(buf, ipBytes...)
 	buf = append(buf, utils.Port2Bytes(remoteAddr.Port)...)
+	log.Debug("hub write a success connection response")
 	hp1.Write(buf)
 	return nil
 }
