@@ -138,7 +138,7 @@ func (hp *HubProtocol) onRegister(data []byte) error {
 	hp.usernames = append(hp.usernames, username)
 	hp.hub.Gm.Put(username, hp)
 	if hp.cfg.CheckUser(username, password) {
-		hp.hub.Gm.Put(username, hp.conn.RemoteAddr().String())
+		hp.hub.Gm.Put(username, hp)
 		buf = append(buf, 1) // 1 success
 	} else {
 		buf = append(buf, 0) // 0 failed

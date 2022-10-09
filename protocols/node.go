@@ -89,13 +89,16 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	localPort := (int(buf[16]) << 8) | int(buf[17])
 	udp, conn, err := np.cfg.CreateConnectionToHub()
 	if err != nil {
+		log.Debug("connect to hub error, when connect: %s", err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
 	defer func() { conn.Close() }()
 	localAddr := conn.LocalAddr().String()
-	lConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	lAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	lConn, err := net.Dial("tcp", lAddr)
 	if err != nil {
+		log.Debug("connect to local %s , when connect: %s", lAddr, err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
@@ -185,37 +188,4 @@ func (np *NodeProtocol) StartHeartBeat() {
 func (np *NodeProtocol) StopHeartBeat() {
 	np.heartbeatStop <- 1
 	np.heartbeatTicker.Stop()
-}
-
-func (np *NodeProtocol) Connect(nodeName string, port int) (net.Conn, error) {
-	_, conn, err := np.cfg.CreateConnectionToHub()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	defer func() { conn.Close() }()
-	np1 := NewNodeProtocol(conn, np.cfg, np.node)
-	auth := np.cfg.GetAuth() // if auth is nil, panic occurs when register
-	authBytes := auth.ToBytes()
-	connBytes := append([]byte{0x03}, authBytes...)
-	connBytes = append(connBytes, byte(len(nodeName)))
-	connBytes = append(connBytes, []byte(nodeName)...)
-	connBytes = append(connBytes, byte((port&0xff00)>>8), byte(port&0xff))
-	if err = np1.Write(connBytes); err != nil {
-		return nil, errors.WithStack(err)
-	}
-	buf, err := np1.ReadOneMessage()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	if buf[0] != 0x13 {
-		return nil, errors.WithStack(errors.New("expect connection response unexpect connection"))
-	}
-	raddr, err := np1.onConnectionResponse(buf[1:])
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	laddr := conn.LocalAddr()
-	conn.Close()
-	conn, err = np1.cfg.CreateKcpConnection(raddr, laddr)
-	return conn, err
 }
