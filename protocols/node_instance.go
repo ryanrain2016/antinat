@@ -44,6 +44,7 @@ func (n *Node) Run() {
 	np := NewNodeProtocol(n.conn, n.cfg, n)
 	go np.StartHeartBeat()
 	go np.Register()
+	go n.HandlePortMap()
 	np.Handle(np)
 }
 
@@ -92,6 +93,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 	if err != nil {
 		log.Error("handling port map listen on %s error: %s", pm.BindAddr, err.Error())
 	}
+	log.Info("Listen on %s to redirect to %s:%d", pm.BindAddr, pm.RemoteNode, pm.RemotePort)
 	n.listeners = append(n.listeners, listener)
 	defer func() { listener.Close() }()
 	for {
