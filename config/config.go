@@ -2,6 +2,7 @@ package config
 
 import (
 	"antinat/log"
+	_ "antinat/test"
 	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
