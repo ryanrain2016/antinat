@@ -92,6 +92,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 	listener, err := net.Listen("tcp", pm.BindAddr)
 	if err != nil {
 		log.Error("handling port map listen on %s error: %s", pm.BindAddr, err.Error())
+		return
 	}
 	log.Info("Listen on %s to redirect to %s:%d", pm.BindAddr, pm.RemoteNode, pm.RemotePort)
 	n.listeners = append(n.listeners, listener)

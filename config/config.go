@@ -393,8 +393,11 @@ func (cfg *Config) GetPortMaps() (maps map[string]*PortMap) {
 	for name, mapString := range sections {
 		if pm, err := NewPortMap(name, mapString); err == nil {
 			maps[name] = pm
+		} else {
+			log.Warning("err: %v", err)
 		}
 	}
+	log.Info("port maps: %v", maps)
 	return maps
 }
 
@@ -406,7 +409,7 @@ type PortMap struct {
 }
 
 func NewPortMap(name string, mapString string) (*PortMap, error) {
-	reg := regexp.MustCompile(`((?:(\d+\.\d+\.\d+\.\d+):)?(\d+))\s*[-/;|]\s*([^:+]):(\d+)`)
+	reg := regexp.MustCompile(`((?:(\d+\.\d+\.\d+\.\d+):)?(\d+))\s*[-/;|]\s*([^:]+):(\d+)`)
 	parts := reg.FindStringSubmatch(mapString)
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("invalid config[%s], skip", mapString)
