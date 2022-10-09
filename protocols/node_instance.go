@@ -51,6 +51,7 @@ func (n *Node) Run() {
 }
 
 func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
+	log.Debug("node create a new connetion to hub")
 	_, conn, err := n.cfg.CreateConnectionToHub()
 	if err != nil {
 		return nil, errors.WithStack(err)
@@ -66,20 +67,25 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	}
 	connBytes = append(connBytes, nodeBytes...)
 	connBytes = append(connBytes, utils.Port2Bytes(port)...)
+	log.Debug("node write connect requets to hub")
 	if err = np1.Write(connBytes); err != nil {
 		return nil, errors.WithStack(err)
 	}
 	buf, err := np1.ReadOneMessage()
 	if err != nil {
+		log.Error("node read conncetion response error")
 		return nil, errors.WithStack(err)
 	}
 	if buf[0] != 0x13 {
 		return nil, errors.WithStack(errors.New("expect connection response unexpect connection"))
 	}
+	log.Debug("node read a conncetion response")
 	raddr, err := np1.onConnectionResponse(buf[1:])
 	if err != nil {
+		log.Error("node parse conncetion response error")
 		return nil, errors.WithStack(err)
 	}
+	log.Debug("the oppsite node is behind <%s>", raddr)
 	laddr := conn.LocalAddr()
 	conn.Close()
 	log.Debug("start to connect to remote %s", raddr)

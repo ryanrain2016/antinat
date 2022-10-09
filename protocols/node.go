@@ -85,13 +85,16 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	// create a new connection to hub , to make hole to request addr, then tell hub completemake hole
 	key := buf[:10]
 	raddr := new(net.UDPAddr)
-	fmt.Printf("onConnect buf: %v\n", buf)
 	raddr.IP, buf, err = utils.ParseIP(buf[10:])
 	if err != nil {
+		log.Error("parse IP error, when connect: %s", err.Error())
+		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
 	raddr.Port, buf, err = utils.ParsePort(buf)
 	if err != nil {
+		log.Error("parse port error, when connect: %s", err.Error())
+		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
 	localPort, _, err := utils.ParsePort(buf)
@@ -100,24 +103,27 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	// localPort := (int(buf[16]) << 8) | int(buf[17])
 	udp, conn, err := np.cfg.CreateConnectionToHub()
 	if err != nil {
-		log.Debug("connect to hub error, when connect: %s", err.Error())
+		log.Error("connect to hub error, when connect: %s", err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
 	defer func() { conn.Close() }()
 	localAddr := conn.LocalAddr().String()
 	lAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	log.Debug("connecting to local<%s>", lAddr)
 	lConn, err := net.Dial("tcp", lAddr)
 	if err != nil {
 		log.Debug("connect to local %s , when connect: %s", lAddr, err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
+	log.Debug("connect to local<%s> done", lAddr)
 	for i := 0; i <= 10; i++ { // make hole
 		udp.WriteToUDP([]byte("\x0f\xff"), raddr)
 	}
 	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
 	np1 := NewNodeProtocol(conn, np.cfg, np.node)
+	log.Debug("node write a success connection response")
 	np1.Write(connectResponseBytes)
 	np1.Close()
 	go func() {
