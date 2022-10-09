@@ -82,6 +82,7 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	}
 	laddr := conn.LocalAddr()
 	conn.Close()
+	log.Debug("start to connect to remote %s", raddr)
 	conn, err = np1.cfg.CreateKcpConnection(raddr, laddr)
 	return conn, err
 }

@@ -85,7 +85,8 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	// create a new connection to hub , to make hole to request addr, then tell hub completemake hole
 	key := buf[:10]
 	raddr := new(net.UDPAddr)
-	raddr.IP, buf, err = utils.ParseIP(buf)
+	fmt.Printf("onConnect buf: %v\n", buf)
+	raddr.IP, buf, err = utils.ParseIP(buf[10:])
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -127,6 +128,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 			}
 		}()
 		defer lConn.Close()
+		log.Debug("start listen on %s...", localAddr)
 		listener, err := np.cfg.CreateListener(localAddr)
 		if err != nil {
 			panic(err)
