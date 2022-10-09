@@ -186,36 +186,3 @@ func (np *NodeProtocol) StopHeartBeat() {
 	np.heartbeatStop <- 1
 	np.heartbeatTicker.Stop()
 }
-
-func (np *NodeProtocol) Connect(nodeName string, port int) (net.Conn, error) {
-	_, conn, err := np.cfg.CreateConnectionToHub()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	defer func() { conn.Close() }()
-	np1 := NewNodeProtocol(conn, np.cfg, np.node)
-	auth := np.cfg.GetAuth() // if auth is nil, panic occurs when register
-	authBytes := auth.ToBytes()
-	connBytes := append([]byte{0x03}, authBytes...)
-	connBytes = append(connBytes, byte(len(nodeName)))
-	connBytes = append(connBytes, []byte(nodeName)...)
-	connBytes = append(connBytes, byte((port&0xff00)>>8), byte(port&0xff))
-	if err = np1.Write(connBytes); err != nil {
-		return nil, errors.WithStack(err)
-	}
-	buf, err := np1.ReadOneMessage()
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	if buf[0] != 0x13 {
-		return nil, errors.WithStack(errors.New("expect connection response unexpect connection"))
-	}
-	raddr, err := np1.onConnectionResponse(buf[1:])
-	if err != nil {
-		return nil, errors.WithStack(err)
-	}
-	laddr := conn.LocalAddr()
-	conn.Close()
-	conn, err = np1.cfg.CreateKcpConnection(raddr, laddr)
-	return conn, err
-}

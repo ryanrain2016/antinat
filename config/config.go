@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/Unknwon/goconfig"
@@ -380,4 +381,44 @@ func (cfg *Config) GetAuth() *Auth {
 
 func (cfg *Config) GetConsoleAddr() {
 
+}
+
+func (cfg *Config) GetPortMaps() (maps map[string]*PortMap) {
+	maps = make(map[string]*PortMap)
+	section := fmt.Sprintf("%s.map", cfg.instanceName)
+	sections, err := config.GetSection(section)
+	if err != nil {
+		return
+	}
+	for name, mapString := range sections {
+		if pm, err := NewPortMap(name, mapString); err == nil {
+			maps[name] = pm
+		}
+	}
+	return maps
+}
+
+type PortMap struct {
+	Name       string
+	BindAddr   string
+	RemoteNode string
+	RemotePort int
+}
+
+func NewPortMap(name string, mapString string) (*PortMap, error) {
+	reg := regexp.MustCompile(`((?:(\d+\.\d+\.\d+\.\d+):)?(\d+))\s*[-/;|]\s*([^:+]):(\d+)`)
+	parts := reg.FindStringSubmatch(mapString)
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("invalid config[%s], skip", mapString)
+	}
+	pm := new(PortMap)
+	pm.Name = name
+	if parts[2] == "" {
+		pm.BindAddr = "127.0.0.1:" + parts[3]
+	} else {
+		pm.BindAddr = parts[1]
+	}
+	pm.RemoteNode = parts[4]
+	pm.RemotePort, _ = strconv.Atoi(parts[5])
+	return pm, nil
 }
