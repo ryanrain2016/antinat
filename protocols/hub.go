@@ -113,6 +113,8 @@ func (hp *HubProtocol) OnMessage(msg []byte) error {
 		return hp.onRegister(msg[1:])
 	case 0x03: // 连接请求包
 		return hp.onConnection(msg[1:])
+	case 0x13: // 连接响应包
+		return hp.onConnectionResponse(msg[1:])
 	case 0x0a: // 控制台消息
 		return hp.onConsole(msg[1:])
 	default:
@@ -166,10 +168,38 @@ func (hp *HubProtocol) onConnection(data []byte) (err error) {
 	)
 	remoteHp := hp.hub.Gm.Get(node).(*HubProtocol)
 	key := hp.hub.Gm.PutWithRandomKey(hp)
+	addr := hp.conn.RemoteAddr().(*net.UDPAddr)
+	port := addr.Port
 	buf := append([]byte{0x03}, []byte(key)...) // request connect
-	// TODO 添加连接请求方的地址, node收到后要向该地址发送若干udp包打洞
+	buf = append(buf, addr.IP...)
+	buf = append(buf, byte((port&0xff00)>>8), byte(port&0xff))
 	buf = append(buf, portBytes...)
 	remoteHp.Write(buf)
+	return nil
+}
+
+func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
+	// data[0] == 0 failed； data[0] == 1 success
+	// data[1:11] key
+	// if success; get hp.conn.RemoteAddr send to request node
+	// else send failed to request node
+	key := string(data[1:11])
+	hp1, ok := hp.hub.Gm.Pop(key).(*HubProtocol)
+	if !ok || hp1 == nil {
+		return errors.WithStack(errors.New("invalid connection response"))
+	}
+	defer hp1.Close()
+	if data[0] == 0 {
+		hp1.Write([]byte{0x13, 0x00})
+		log.Debug("connect failed")
+		return nil
+	}
+	buf := []byte{0x13, 0x01}
+	remoteAddr, _ := hp.conn.RemoteAddr().(*net.UDPAddr)
+	port := remoteAddr.Port
+	buf = append(buf, remoteAddr.IP...)
+	buf = append(buf, byte((port&0xff00)>>8), byte(port&0xff))
+	hp1.Write(buf)
 	return nil
 }
 

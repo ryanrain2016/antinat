@@ -328,7 +328,7 @@ func (cfg *Config) CreateConnectionToHub() (udp *net.UDPConn, conn net.Conn, err
 	return
 }
 
-func (cfg *Config) CreateHubListener(bind_addr string) (listener net.Listener, err error) {
+func (cfg *Config) CreateListener(bind_addr string) (listener net.Listener, err error) {
 	kc := cfg.getKcpConfig()
 	if kc == nil {
 		// return net.Listen("tcp", bind_addr)

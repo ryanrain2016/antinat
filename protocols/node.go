@@ -4,6 +4,7 @@ import (
 	"antinat/config"
 	"antinat/log"
 	"fmt"
+	"io"
 	"net"
 	"time"
 
@@ -73,17 +74,73 @@ func (np *NodeProtocol) onRegisterResponse(buf []byte) error {
 	panic(ErrREGISTER_FAILED)
 }
 
-func (np *NodeProtocol) onConnection(buf []byte) (err error) {
-	// create a new connection to hub, to make hole to request addr
+func (np *NodeProtocol) onConnectionFailed(key []byte) (err error) {
+	connectResponseBytes := append([]byte{0x13, 0x00}, key...)
+	return np.Write(connectResponseBytes)
+}
 
+func (np *NodeProtocol) onConnection(buf []byte) (err error) {
+	// buf: key: 10byte, remote_ip: 4byte, remote_port 2 byte, local_port 2 byte
+	// create a new connection to hub , to make hole to request addr, then tell hub completemake hole
+	key := buf[:10]
+	raddr := new(net.UDPAddr)
+	raddr.IP = net.IP(buf[10:14])
+	raddr.Port = (int(buf[14]) << 8) | int(buf[15])
+	localPort := (int(buf[16]) << 8) | int(buf[17])
+	udp, conn, err := np.cfg.CreateConnectionToHub()
+	if err != nil {
+		np.onConnectionFailed(key)
+		return errors.WithStack(err)
+	}
+	defer func() { conn.Close() }()
+	localAddr := conn.LocalAddr().String()
+	lConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	if err != nil {
+		np.onConnectionFailed(key)
+		return errors.WithStack(err)
+	}
+	for i := 0; i <= 10; i++ { // make hole
+		udp.WriteToUDP([]byte("\x0f\xff"), raddr)
+	}
+	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
+	np1 := NewNodeProtocol(conn, np.cfg, np.node)
+	np1.Write(connectResponseBytes)
+	np1.Close()
+	go func() {
+		defer func() {
+			if e := recover(); e != nil {
+				err := e.(error)
+				log.Error("unexpect error: %s", err.Error())
+			}
+		}()
+		defer lConn.Close()
+		listener, err := np.cfg.CreateListener(localAddr)
+		if err != nil {
+			panic(err)
+		}
+		defer listener.Close()
+		conn, err := listener.Accept()
+		if err != nil {
+			panic(err)
+		}
+		defer conn.Close()
+		go io.Copy(conn, lConn)
+		io.Copy(lConn, conn)
+	}()
 	return nil
 }
 
 func (np *NodeProtocol) onConnectionResponse(buf []byte) (raddr string, err error) {
+	// buf[0] == 1 success
+	// buf[0] == 0 failed
+	// when success buf[1:5]: IP
+	// buf[6:8] == port
 	if buf[0] != 1 {
 		return "", errors.WithStack(errors.New("connection error"))
 	}
-	return "", nil
+	ip := net.IP(buf[1:5]).String()
+	port := (int(buf[6]) << 8) | int(buf[7])
+	return fmt.Sprintf("%s:%d", ip, port), nil
 }
 
 func (np *NodeProtocol) onControl(data []byte) (err error) {

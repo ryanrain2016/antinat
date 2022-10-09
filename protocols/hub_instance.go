@@ -93,7 +93,7 @@ func (h *Hub) listen() (err error) {
 		return
 	}
 	var listener net.Listener
-	listener, err = h.cfg.CreateHubListener(bind_addr)
+	listener, err = h.cfg.CreateListener(bind_addr)
 	if err == nil {
 		log.Info("listening on [%s] ...", bind_addr)
 		h.listener = listener
