@@ -10,9 +10,10 @@ import (
 )
 
 type Node struct {
-	cfg  *config.Config
-	conn net.Conn
-	Gm   *GlobalMap
+	cfg       *config.Config
+	conn      net.Conn
+	Gm        *GlobalMap
+	listeners []net.Listener
 }
 
 func NewNode(cfg *config.Config) (n *Node, err error) {
@@ -23,6 +24,7 @@ func NewNode(cfg *config.Config) (n *Node, err error) {
 		return nil, err
 	}
 	n.conn = conn
+	n.listeners = make([]net.Listener, 0)
 	n.Gm = &GlobalMap{
 		lock:  make(chan int, 1),
 		inner: make(map[string]interface{}),
@@ -38,6 +40,7 @@ func (n *Node) Run() {
 			log.Error("server run error: %s", err.Error())
 		}
 	}()
+	defer n.Close()
 	np := NewNodeProtocol(n.conn, n.cfg, n)
 	go np.StartHeartBeat()
 	go np.Register()
@@ -89,6 +92,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 	if err != nil {
 		log.Error("handling port map listen on %s error: %s", pm.BindAddr, err.Error())
 	}
+	n.listeners = append(n.listeners, listener)
 	defer func() { listener.Close() }()
 	for {
 		conn, err := listener.Accept()
@@ -106,5 +110,11 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 			go io.Copy(conn, rConn)
 			io.Copy(rConn, conn)
 		}()
+	}
+}
+
+func (n *Node) Close() {
+	for _, l := range n.listeners {
+		l.Close()
 	}
 }
