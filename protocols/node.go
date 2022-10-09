@@ -152,7 +152,7 @@ func (np *NodeProtocol) onConnectionResponse(buf []byte) (raddr string, err erro
 	}
 	// ip := net.IP(buf[1:5]).String()
 	// port := (int(buf[6]) << 8) | int(buf[7])
-	ip, buf, err := utils.ParseIP(buf)
+	ip, buf, err := utils.ParseIP(buf[1:])
 	if err != nil {
 		return "", errors.WithStack(err)
 	}

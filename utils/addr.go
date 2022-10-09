@@ -13,7 +13,7 @@ func IP2Bytes(ip net.IP) ([]byte, error) {
 	}
 	ipv6 := ip.To16()
 	if ipv6 != nil {
-		return append([]byte{0x04}, []byte(ipv6)...), nil
+		return append([]byte{0x06}, []byte(ipv6)...), nil
 	}
 	return nil, errors.WithStack(errors.New("invalid ip"))
 }
