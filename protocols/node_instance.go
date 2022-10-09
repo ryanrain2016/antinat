@@ -3,6 +3,8 @@ package protocols
 import (
 	"antinat/config"
 	"antinat/log"
+	"antinat/utils"
+	"fmt"
 	"io"
 	"net"
 
@@ -58,9 +60,12 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	auth := n.cfg.GetAuth() // if auth is nil, panic occurs when register
 	authBytes := auth.ToBytes()
 	connBytes := append([]byte{0x03}, authBytes...)
-	connBytes = append(connBytes, byte(len(nodeName)))
-	connBytes = append(connBytes, []byte(nodeName)...)
-	connBytes = append(connBytes, byte((port&0xff00)>>8), byte(port&0xff))
+	nodeBytes, err := utils.String2Bytes(nodeName)
+	if err != nil {
+		return nil, errors.WithStack(fmt.Errorf("node name is to long: %s", nodeName))
+	}
+	connBytes = append(connBytes, nodeBytes...)
+	connBytes = append(connBytes, utils.Port2Bytes(port)...)
 	if err = np1.Write(connBytes); err != nil {
 		return nil, errors.WithStack(err)
 	}

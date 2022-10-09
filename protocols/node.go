@@ -3,6 +3,7 @@ package protocols
 import (
 	"antinat/config"
 	"antinat/log"
+	"antinat/utils"
 	"fmt"
 	"io"
 	"net"
@@ -80,13 +81,22 @@ func (np *NodeProtocol) onConnectionFailed(key []byte) (err error) {
 }
 
 func (np *NodeProtocol) onConnection(buf []byte) (err error) {
-	// buf: key: 10byte, remote_ip: 4byte, remote_port 2 byte, local_port 2 byte
+	// buf: key: 10byte, remote_ip(5 or 17 byte), remote_port 2 byte, local_port 2 byte
 	// create a new connection to hub , to make hole to request addr, then tell hub completemake hole
 	key := buf[:10]
 	raddr := new(net.UDPAddr)
-	raddr.IP = net.IP(buf[10:14])
-	raddr.Port = (int(buf[14]) << 8) | int(buf[15])
-	localPort := (int(buf[16]) << 8) | int(buf[17])
+	raddr.IP, buf, err = utils.ParseIP(buf)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	raddr.Port, buf, err = utils.ParsePort(buf)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	localPort, _, err := utils.ParsePort(buf)
+	// raddr.IP = net.IP(buf[10:14])
+	// raddr.Port = (int(buf[14]) << 8) | int(buf[15])
+	// localPort := (int(buf[16]) << 8) | int(buf[17])
 	udp, conn, err := np.cfg.CreateConnectionToHub()
 	if err != nil {
 		log.Debug("connect to hub error, when connect: %s", err.Error())
@@ -136,13 +146,20 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 func (np *NodeProtocol) onConnectionResponse(buf []byte) (raddr string, err error) {
 	// buf[0] == 1 success
 	// buf[0] == 0 failed
-	// when success buf[1:5]: IP
-	// buf[6:8] == port
+	// when success buf[1:]: addr
 	if buf[0] != 1 {
 		return "", errors.WithStack(errors.New("connection error"))
 	}
-	ip := net.IP(buf[1:5]).String()
-	port := (int(buf[6]) << 8) | int(buf[7])
+	// ip := net.IP(buf[1:5]).String()
+	// port := (int(buf[6]) << 8) | int(buf[7])
+	ip, buf, err := utils.ParseIP(buf)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+	port, _, err := utils.ParsePort(buf)
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
 	return fmt.Sprintf("%s:%d", ip, port), nil
 }
 

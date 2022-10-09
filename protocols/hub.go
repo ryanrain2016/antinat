@@ -3,6 +3,7 @@ package protocols
 import (
 	"antinat/config"
 	"antinat/log"
+	"antinat/utils"
 	"fmt"
 	"io"
 	"net"
@@ -148,18 +149,27 @@ func (hp *HubProtocol) onRegister(data []byte) error {
 
 func (hp *HubProtocol) onConnection(data []byte) (err error) {
 	defer func() { hp.loop = false }() // 新建的连接请求的连接，不走消息循环
-	usernameLen := int(data[0])
-	username := string(data[1 : 1+usernameLen])
-	passLen := int(data[1+usernameLen])
-	password := string(data[2+usernameLen : 2+usernameLen+passLen])
+	username, data, err := utils.ParseString(data)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	password, data, err := utils.ParseString(data)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	if !hp.cfg.CheckUser(username, password) {
 		hp.Write([]byte("\x13\x00"))
 		return errors.WithStack(errors.New("connection auth failed"))
 	}
-	nodeLen := int(data[2+usernameLen+passLen])
-	node := string(data[3+usernameLen+passLen : 3+usernameLen+passLen+nodeLen])
-	portBytes := data[3+usernameLen+passLen+nodeLen : 5+usernameLen+passLen+nodeLen]
-	rport := (int(portBytes[0]) << 8) + int(portBytes[1])
+	node, data, err := utils.ParseString(data)
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	portBytes := data[:2]
+	rport, _, err := utils.ParsePort(data)
+	if err != nil {
+		return errors.WithStack(err)
+	}
 	log.Info("<%s> connection from <%s> to <%s>:<%d>",
 		hp.cfg.GetInstanceName(),
 		hp.conn.RemoteAddr().String(),
@@ -169,10 +179,10 @@ func (hp *HubProtocol) onConnection(data []byte) (err error) {
 	remoteHp := hp.hub.Gm.Get(node).(*HubProtocol)
 	key := hp.hub.Gm.PutWithRandomKey(hp)
 	addr := hp.conn.RemoteAddr().(*net.UDPAddr)
-	port := addr.Port
 	buf := append([]byte{0x03}, []byte(key)...) // request connect
-	buf = append(buf, addr.IP...)
-	buf = append(buf, byte((port&0xff00)>>8), byte(port&0xff))
+	ipBytes, _ := utils.IP2Bytes(addr.IP)
+	buf = append(buf, ipBytes...)
+	buf = append(buf, utils.Port2Bytes(addr.Port)...)
 	buf = append(buf, portBytes...)
 	remoteHp.Write(buf)
 	return nil
@@ -196,9 +206,9 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 	}
 	buf := []byte{0x13, 0x01}
 	remoteAddr, _ := hp.conn.RemoteAddr().(*net.UDPAddr)
-	port := remoteAddr.Port
-	buf = append(buf, remoteAddr.IP...)
-	buf = append(buf, byte((port&0xff00)>>8), byte(port&0xff))
+	ipBytes, _ := utils.IP2Bytes(remoteAddr.IP)
+	buf = append(buf, ipBytes...)
+	buf = append(buf, utils.Port2Bytes(remoteAddr.Port)...)
 	hp1.Write(buf)
 	return nil
 }
