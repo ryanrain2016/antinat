@@ -89,13 +89,16 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	localPort := (int(buf[16]) << 8) | int(buf[17])
 	udp, conn, err := np.cfg.CreateConnectionToHub()
 	if err != nil {
+		log.Debug("connect to hub error, when connect: %s", err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
 	defer func() { conn.Close() }()
 	localAddr := conn.LocalAddr().String()
-	lConn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", localPort))
+	lAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	lConn, err := net.Dial("tcp", lAddr)
 	if err != nil {
+		log.Debug("connect to local %s , when connect: %s", lAddr, err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
