@@ -218,6 +218,8 @@ func (np *NodeProtocol) StartHeartBeat() {
 }
 
 func (np *NodeProtocol) StopHeartBeat() {
-	np.heartbeatStop <- 1
+	defer recover()
 	np.heartbeatTicker.Stop()
+	np.heartbeatStop <- 1
+	close(np.heartbeatStop)
 }
