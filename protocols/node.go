@@ -6,6 +6,7 @@ import (
 	"antinat/utils"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"time"
 
@@ -240,15 +241,18 @@ func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr) {
 		IP:   raddr.IP,
 		Port: raddr.Port,
 	}
-	bindaddr, _ := np.cfg.GetBindAddr()
-	addr, _ := net.ResolveUDPAddr("udp4", bindaddr)
-	for j := 0; j < 10; j++ {
-		udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), addr)
-	}
-	for i := 0; i < 10; i++ {
+	// bindaddr, _ := np.cfg.GetBindAddr()
+	// addr, _ := net.ResolveUDPAddr("udp4", bindaddr)
+	// for j := 0; j < 10; j++ {
+	// 	udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), addr)
+	// }
+	for i := 0; i < 1; i++ {
 		rr.Port += 1
 		for j := 0; j < 100; j++ {
-			udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), rr)
+			n := rand.Intn(10) + 1
+			result := make([]byte, n)
+			rand.Read(result)
+			udp.WriteToUDP(result, rr)
 		}
 	}
 }
