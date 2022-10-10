@@ -219,8 +219,7 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 	buf = append(buf, ipBytes...)
 	buf = append(buf, utils.Port2Bytes(remoteAddr.Port)...)
 	log.Debug("hub write a success connection response")
-	hp1.Write(buf)
-	return nil
+	return errors.WithStack(hp1.Write(buf))
 }
 
 func (hp *HubProtocol) onConsole(data []byte) (err error) {
