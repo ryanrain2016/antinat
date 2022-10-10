@@ -118,7 +118,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		return errors.WithStack(err)
 	}
 	log.Debug("connect to local<%s> done, start to make hole to %s", lAddr, raddr)
-	MakeHole(udp, raddr)
+	np.MakeHole(udp, raddr)
 	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
 	np1 := NewNodeProtocol(conn, np.cfg, np.node)
 	log.Debug("node write a success connection response")
@@ -235,14 +235,19 @@ func (np *NodeProtocol) StopHeartBeat() {
 	close(np.heartbeatStop)
 }
 
-func MakeHole(udp *net.UDPConn, raddr *net.UDPAddr) {
+func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr) {
 	rr := &net.UDPAddr{
 		IP:   raddr.IP,
 		Port: raddr.Port,
 	}
-	for i := 0; i < 20; i++ {
+	bindaddr, _ := np.cfg.GetBindAddr()
+	addr, _ := net.ResolveUDPAddr("udp4", bindaddr)
+	for j := 0; j < 10; j++ {
+		udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), addr)
+	}
+	for i := 0; i < 10; i++ {
 		rr.Port += 1
-		for j := 0; j < 100; j++ {
+		for j := 0; j < 1000; j++ {
 			udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), rr)
 		}
 	}
