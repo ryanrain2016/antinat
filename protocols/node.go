@@ -153,7 +153,8 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 			}
 			remoteAddr := conn.RemoteAddr().String()
 			log.Debug("get a connection from %s, expect %s", remoteAddr, raddr)
-			if remoteAddr != raddr.String() {
+			hubAddr, _ := np.cfg.GetHubAddr()
+			if remoteAddr == hubAddr {
 				conn.Close()
 				continue
 			} else {
@@ -235,7 +236,14 @@ func (np *NodeProtocol) StopHeartBeat() {
 }
 
 func MakeHole(udp *net.UDPConn, raddr *net.UDPAddr) {
-	for j := 0; j < 50; j++ {
-		udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), raddr)
+	rr := &net.UDPAddr{
+		IP:   raddr.IP,
+		Port: raddr.Port,
+	}
+	for i := 0; i < 20; i++ {
+		rr.Port += 1
+		for j := 0; j < 100; j++ {
+			udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), rr)
+		}
 	}
 }
