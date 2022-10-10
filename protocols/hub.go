@@ -201,7 +201,7 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 		return errors.WithStack(errors.New("invalid connection response"))
 	}
 	log.Debug("find request conncetion from %s", hp1.conn.RemoteAddr())
-	defer hp1.Close()
+	// defer hp1.Close()
 	if data[0] == 0 {
 		hp1.Write([]byte{0x13, 0x00})
 		log.Debug("connect failed")
