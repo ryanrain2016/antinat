@@ -69,6 +69,7 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	connBytes = append(connBytes, utils.Port2Bytes(port)...)
 	log.Debug("node write connect requets to hub")
 	if err = np1.Write(connBytes); err != nil {
+		log.Error("node write connction request error")
 		return nil, errors.WithStack(err)
 	}
 	buf, err := np1.ReadOneMessage()
@@ -87,7 +88,7 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	}
 	log.Debug("the oppsite node is behind <%s>", raddr)
 	laddr := conn.LocalAddr()
-	conn.Close()
+	np1.Close()
 	log.Debug("start to connect to remote %s", raddr)
 	conn, err = np1.cfg.CreateKcpConnection(raddr, laddr)
 	return conn, err

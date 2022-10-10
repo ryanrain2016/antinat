@@ -45,14 +45,19 @@ func (h *Handler) Handle(mh MessageHandler) {
 
 func (h *Handler) ReadOneMessage() (buf []byte, err error) {
 	buf = make([]byte, 2)
+	log.Trace("start read message length")
 	if _, err = io.ReadFull(h.conn, buf); err != nil {
 		return
 	}
 	size := (int(buf[0]) << 8) + int(buf[1])
+	log.Trace("read message length: %d", size)
 	buf = make([]byte, size)
-	if _, err = io.ReadFull(h.conn, buf); err != nil {
+	log.Trace("start read message")
+	if _, err = io.ReadFull(h.conn, buf); err != nil && err != io.EOF {
+		log.Trace("read mesage error: %s", err.Error())
 		return
 	}
+	log.Trace("Read one message")
 	return buf, nil
 }
 
