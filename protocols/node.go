@@ -136,7 +136,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		defer func() {
 			if e := recover(); e != nil {
 				err := e.(error)
-				log.Error("unexpect error: %s", err.Error())
+				log.Error("unexpect error: %+v", err)
 			}
 		}()
 		defer lConn.Close()
@@ -218,7 +218,9 @@ func (np *NodeProtocol) StartHeartBeat() {
 }
 
 func (np *NodeProtocol) StopHeartBeat() {
-	defer recover()
+	defer func() {
+		_ = recover()
+	}()
 	np.heartbeatTicker.Stop()
 	np.heartbeatStop <- 1
 	close(np.heartbeatStop)
