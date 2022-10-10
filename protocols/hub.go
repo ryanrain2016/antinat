@@ -184,7 +184,12 @@ func (hp *HubProtocol) onConnection(data []byte) (err error) {
 		node,
 		rport,
 	)
-	remoteHp := hp.hub.Gm.Get(node).(*HubProtocol)
+	remoteHpI := hp.hub.Gm.Get(node)
+	if remoteHpI == nil {
+		hp.Write([]byte("\x13\x00"))
+		return errors.WithStack(fmt.Errorf("connect to <%s> failed, it's offline", node))
+	}
+	remoteHp := remoteHpI.(*HubProtocol)
 	key := hp.hub.Gm.PutWithRandomKey(hp)
 	addr := hp.conn.RemoteAddr().(*net.UDPAddr)
 	buf := append([]byte{0x03}, []byte(key)...) // request connect
