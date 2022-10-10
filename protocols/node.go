@@ -29,7 +29,7 @@ func NewNodeProtocol(conn net.Conn, cfg *config.Config, node *Node) *NodeProtoco
 	np.connections = make([]net.Conn, 0)
 	np.heartbeat = 0
 	np.heartbeatTicker = time.NewTicker(time.Second * 30)
-	np.heartbeatStop = make(chan int)
+	np.heartbeatStop = make(chan int, 1)
 	np.node = node
 	np.loop = true
 	return np
@@ -140,8 +140,8 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 			}
 		}()
 		defer lConn.Close()
-		np1.Close()
 		log.Debug("start listen on %s...", localAddr)
+		np1.Close()
 		listener, err := np.cfg.CreateListener(localAddr)
 		if err != nil {
 			panic(err)
