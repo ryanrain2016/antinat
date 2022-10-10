@@ -38,7 +38,7 @@ func (h *Handler) Handle(mh MessageHandler) {
 			return
 		}
 		if err = mh.OnMessage(buf); err != nil {
-			log.Error("handle message error: %s", err.Error())
+			log.Error("handle message error: %+v", err)
 		}
 	}
 }
@@ -153,7 +153,8 @@ func (hp *HubProtocol) onRegister(data []byte) error {
 }
 
 func (hp *HubProtocol) onConnection(data []byte) (err error) {
-	defer func() { hp.loop = false }() // 新建的连接请求的连接，不走消息循环
+	// defer func() { hp.loop = false }() // 新建的连接请求的连接，不走消息循环
+	// 这里不能关闭，不然发送响应消息时 连接已关闭
 	username, data, err := utils.ParseString(data)
 	if err != nil {
 		return errors.WithStack(err)
