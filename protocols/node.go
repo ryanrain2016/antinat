@@ -247,12 +247,12 @@ func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr) {
 	// 	udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), addr)
 	// }
 	for i := 0; i < 1; i++ {
-		rr.Port += 1
-		for j := 0; j < 100; j++ {
-			n := rand.Intn(10) + 1
+		rr.Port += i
+		for j := 0; j < 50; j++ {
+			n := rand.Intn(20) + 1
 			result := make([]byte, n)
 			rand.Read(result)
-			udp.WriteToUDP(result, rr)
+			udp.WriteToUDP(result, raddr)
 		}
 	}
 }
