@@ -123,10 +123,15 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	}
 	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
 	np1 := NewNodeProtocol(conn, np.cfg, np.node)
+	defer np1.Close()
 	log.Debug("node write a success connection response")
-	np1.Write(connectResponseBytes)
+	err = np1.Write(connectResponseBytes)
+	if err != nil {
+		log.Error("send to connect response error")
+		lConn.Close()
+		return errors.WithStack(err)
+	}
 	log.Debug("node write response done")
-	np1.Close()
 	go func() {
 		defer func() {
 			if e := recover(); e != nil {
