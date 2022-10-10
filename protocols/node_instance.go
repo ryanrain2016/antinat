@@ -57,7 +57,7 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 		return nil, errors.WithStack(err)
 	}
 	defer func() { conn.Close() }()
-	np1 := NewNodeProtocol(conn, n.cfg, n)
+	np := NewNodeProtocol(conn, n.cfg, n)
 	auth := n.cfg.GetAuth() // if auth is nil, panic occurs when register
 	authBytes := auth.ToBytes()
 	connBytes := append([]byte{0x03}, authBytes...)
@@ -68,11 +68,11 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	connBytes = append(connBytes, nodeBytes...)
 	connBytes = append(connBytes, utils.Port2Bytes(port)...)
 	log.Debug("node write connect requets to hub")
-	if err = np1.Write(connBytes); err != nil {
+	if err = np.Write(connBytes); err != nil {
 		log.Error("node write connction request error")
 		return nil, errors.WithStack(err)
 	}
-	buf, err := np1.ReadOneMessage()
+	buf, err := np.ReadOneMessage()
 	if err != nil {
 		log.Error("node read conncetion response error")
 		return nil, errors.WithStack(err)
@@ -81,17 +81,22 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 		return nil, errors.WithStack(errors.New("expect connection response unexpect connection"))
 	}
 	log.Debug("node read a conncetion response")
-	raddr, err := np1.onConnectionResponse(buf[1:])
+	raddr, err := np.onConnectionResponse(buf[1:])
 	if err != nil {
 		log.Error("node parse conncetion response error")
 		return nil, errors.WithStack(err)
 	}
 	log.Debug("the oppsite node is behind <%s>", raddr)
 	laddr := conn.LocalAddr()
-	np1.Close()
-	log.Debug("start to connect to remote %s", raddr)
-	conn, err = np1.cfg.CreateKcpConnection(raddr, laddr)
-	return conn, err
+	np.Close()
+	log.Debug("start to connect to remote %s from %s", raddr, laddr)
+	_, newConn, err := n.cfg.CreateKcpConnection(raddr, laddr)
+	if err != nil {
+		log.Debug("connect failed to remote failed")
+		return nil, errors.WithStack(err)
+	}
+	log.Debug("connected to remote %s from %s", newConn.RemoteAddr(), newConn.LocalAddr())
+	return newConn, err
 }
 
 func (n *Node) HandlePortMap() {
@@ -124,7 +129,10 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 			}
 			defer func() { rConn.Close() }()
 			go io.Copy(conn, rConn)
-			io.Copy(rConn, conn)
+			_, err = io.Copy(rConn, conn)
+			if err != nil {
+				log.Debug("error when pipe: %s", err.Error())
+			}
 		}()
 	}
 }

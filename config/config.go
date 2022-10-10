@@ -264,21 +264,26 @@ func (cfg *Config) GetKcpConfig() *KcpConfig {
 	return cfg.kc
 }
 
-func (cfg *Config) CreateKcpConnection(raddr string, laddr net.Addr) (conn net.Conn, err error) {
+func (cfg *Config) CreateKcpConnection(raddr string, laddr net.Addr) (udp *net.UDPConn, conn net.Conn, err error) {
 	kc := cfg.getKcpConfig()
 	if kc == nil {
-		return nil, fmt.Errorf("[%s.kcp] config not right", cfg.instanceName)
+		return nil, nil, fmt.Errorf("[%s.kcp] config not right", cfg.instanceName)
 	}
 	addr := laddr.(*net.UDPAddr)
-	udp, err := net.ListenUDP("udp", addr)
+	network := "udp4"
+	if addr.IP.To4() == nil {
+		network = "udp"
+	}
+	udp, err = net.ListenUDP(network, addr)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if block := kc.GetEncryptBlock(); block != nil {
-		return kcp.NewConn2(addr, block, 10, 3, udp)
+		conn, err = kcp.NewConn(raddr, block, 10, 3, udp)
 	} else {
-		return kcp.NewConn2(addr, nil, 0, 0, udp)
+		conn, err = kcp.NewConn(raddr, nil, 0, 0, udp)
 	}
+	return
 }
 
 func (cfg *Config) createKcpListener(laddr net.Addr) (listener net.Listener, err error) {

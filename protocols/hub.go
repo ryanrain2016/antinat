@@ -34,7 +34,7 @@ func (h *Handler) Handle(mh MessageHandler) {
 	for h.loop {
 		buf, err := h.ReadOneMessage()
 		if err != nil {
-			log.Error("read message error: %s", err.Error())
+			log.Error("read message error: %s", err)
 			return
 		}
 		if err = mh.OnMessage(buf); err != nil {
@@ -47,6 +47,7 @@ func (h *Handler) ReadOneMessage() (buf []byte, err error) {
 	buf = make([]byte, 2)
 	log.Trace("start read message length")
 	if _, err = io.ReadFull(h.conn, buf); err != nil {
+		// err = errors.WithStack(err)
 		return
 	}
 	size := (int(buf[0]) << 8) + int(buf[1])
@@ -54,7 +55,8 @@ func (h *Handler) ReadOneMessage() (buf []byte, err error) {
 	buf = make([]byte, size)
 	log.Trace("start read message")
 	if _, err = io.ReadFull(h.conn, buf); err != nil && err != io.EOF {
-		log.Trace("read mesage error: %s", err.Error())
+		log.Trace("read mesage from %s error: %s", h.conn.RemoteAddr(), err.Error())
+		// err = errors.WithStack(err)
 		return
 	}
 	log.Trace("Read one message")
@@ -207,7 +209,7 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 		return errors.WithStack(errors.New("invalid connection response"))
 	}
 	log.Debug("find request conncetion from %s", hp1.conn.RemoteAddr())
-	// defer hp1.Close()
+	defer hp1.Close()
 	if data[0] == 0 {
 		hp1.Write([]byte{0x13, 0x00})
 		log.Debug("connect failed")

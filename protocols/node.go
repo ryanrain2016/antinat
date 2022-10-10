@@ -118,17 +118,15 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		return errors.WithStack(err)
 	}
 	log.Debug("connect to local<%s> done, start to make hole to %s", lAddr, raddr)
-	for i := 0; i <= 10; i++ { // make hole
-		udp.WriteToUDP([]byte("\x0f\xff"), raddr)
-	}
+	MakeHole(udp, raddr)
 	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
 	np1 := NewNodeProtocol(conn, np.cfg, np.node)
-	defer np1.Close()
 	log.Debug("node write a success connection response")
 	err = np1.Write(connectResponseBytes)
 	if err != nil {
 		log.Error("send to connect response error")
 		lConn.Close()
+		np1.Close()
 		return errors.WithStack(err)
 	}
 	log.Debug("node write response done")
@@ -136,7 +134,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		defer func() {
 			if e := recover(); e != nil {
 				err := e.(error)
-				log.Error("unexpect error: %+v", err)
+				log.Error("unexpect error when accept connection from other node: %+v", err)
 			}
 		}()
 		defer lConn.Close()
@@ -147,10 +145,22 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 			panic(err)
 		}
 		defer listener.Close()
-		conn, err := listener.Accept()
-		if err != nil {
-			panic(err)
+		var conn net.Conn
+		for {
+			conn, err = listener.Accept()
+			if err != nil {
+				panic(err)
+			}
+			remoteAddr := conn.RemoteAddr().String()
+			log.Debug("get a connection from %s, expect %s", remoteAddr, raddr)
+			if remoteAddr != raddr.String() {
+				conn.Close()
+				continue
+			} else {
+				break
+			}
 		}
+		log.Debug("accept a connection from %s", conn.RemoteAddr().String())
 		defer conn.Close()
 		go io.Copy(conn, lConn)
 		io.Copy(lConn, conn)
@@ -224,4 +234,17 @@ func (np *NodeProtocol) StopHeartBeat() {
 	np.heartbeatTicker.Stop()
 	np.heartbeatStop <- 1
 	close(np.heartbeatStop)
+}
+
+func MakeHole(udp *net.UDPConn, raddr *net.UDPAddr) {
+	rraddr := &net.UDPAddr{
+		IP:   raddr.IP,
+		Port: raddr.Port,
+	}
+	for i := 0; i <= 50; i++ { // make hole
+		rraddr.Port += i
+		for j := 0; j < 10; j++ {
+			udp.WriteToUDP([]byte("\x0f\xff"), rraddr)
+		}
+	}
 }
