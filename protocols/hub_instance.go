@@ -115,6 +115,7 @@ func (h *Hub) Run() {
 			log.Debug("<%s> connection from <%s>", h.cfg.GetInstanceName(), conn.RemoteAddr())
 			conn = h.cfg.WrapHubConn(conn)
 			hp := NewHubProtocol(conn, h.cfg, h)
+			hp.RequestRegister()
 			go hp.Handle(hp)
 		}
 	}

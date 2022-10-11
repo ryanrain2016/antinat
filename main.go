@@ -15,11 +15,13 @@ func main() {
 func run() {
 	instances, _ := config.GetInstances()
 	for _, v := range instances {
-		cfg := config.NewConfig(v)
-		if inst, err := protocols.NewRunner(cfg); err != nil {
-			log.Error("<%s> start error: %s", cfg.GetInstanceName(), err.Error())
-		} else {
-			go inst.Run()
-		}
+		go func(inst string) {
+			cfg := config.NewConfig(inst)
+			if inst, err := protocols.NewRunner(cfg); err != nil {
+				log.Error("<%s> start error: %s", cfg.GetInstanceName(), err.Error())
+			} else {
+				go inst.Run()
+			}
+		}(v)
 	}
 }

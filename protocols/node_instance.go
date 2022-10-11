@@ -45,7 +45,7 @@ func (n *Node) Run() {
 	defer n.Close()
 	np := NewNodeProtocol(n.conn, n.cfg, n)
 	go np.StartHeartBeat()
-	go np.Register()
+	// go np.Register()
 	go n.HandlePortMap()
 	np.Handle(np)
 }
