@@ -237,22 +237,10 @@ func (np *NodeProtocol) StopHeartBeat() {
 }
 
 func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr) {
-	rr := &net.UDPAddr{
-		IP:   raddr.IP,
-		Port: raddr.Port,
-	}
-	// bindaddr, _ := np.cfg.GetBindAddr()
-	// addr, _ := net.ResolveUDPAddr("udp4", bindaddr)
-	// for j := 0; j < 10; j++ {
-	// 	udp.WriteToUDP([]byte("\x0f\xff\x0f\xff\x0f\xff\x0f\xff"), addr)
-	// }
-	for i := 0; i < 1; i++ {
-		rr.Port += i
-		for j := 0; j < 50; j++ {
-			n := rand.Intn(20) + 1
-			result := make([]byte, n)
-			rand.Read(result)
-			udp.WriteToUDP(result, raddr)
-		}
+	for j := 0; j < 50; j++ {
+		n := rand.Intn(20) + 1
+		result := make([]byte, n)
+		rand.Read(result)
+		udp.WriteToUDP(result, raddr)
 	}
 }
