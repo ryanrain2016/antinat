@@ -59,7 +59,7 @@ func (h *Handler) ReadOneMessage() (buf []byte, err error) {
 		// err = errors.WithStack(err)
 		return
 	}
-	log.Trace("Read one message")
+	log.Trace("Read one message:%v", buf)
 	return buf, nil
 }
 
@@ -78,7 +78,7 @@ type HubProtocol struct {
 	listeners []net.Listener
 	cfg       *config.Config
 	hub       *Hub
-	usernames []string
+	username  string
 }
 
 func NewHubProtocol(conn net.Conn, cfg *config.Config, hub *Hub) *HubProtocol {
@@ -88,7 +88,6 @@ func NewHubProtocol(conn net.Conn, cfg *config.Config, hub *Hub) *HubProtocol {
 	hp.cfg = cfg
 	hp.hub = hub
 	hp.loop = true
-	hp.usernames = make([]string, 0)
 	return hp
 }
 
@@ -102,8 +101,9 @@ func (hp *HubProtocol) Close() error {
 	for _, l := range hp.listeners {
 		errors = append(errors, l.Close())
 	}
-	for _, v := range hp.usernames {
-		hp.hub.Gm.Pop(v)
+	hp1 := hp.hub.Gm.Get(hp.username)
+	if hp1 == hp {
+		hp.hub.Gm.Pop(hp.username)
 	}
 	for _, err := range errors {
 		if err != nil {
@@ -130,6 +130,11 @@ func (hp *HubProtocol) OnMessage(msg []byte) error {
 	}
 }
 
+func (hp *HubProtocol) RequestRegister() error {
+	err := hp.Write([]byte{0x00})
+	return err
+}
+
 func (hp *HubProtocol) onHeartBeat(data []byte) error {
 	buf := make([]byte, 0)
 	buf = append(buf, 0x11)
@@ -143,9 +148,13 @@ func (hp *HubProtocol) onRegister(data []byte) error {
 	passLen := int(data[1+usernameLen])
 	password := string(data[2+usernameLen : 2+usernameLen+passLen])
 	buf := []byte{0x12}
-	hp.usernames = append(hp.usernames, username)
+	hp.username = username
 	hp.hub.Gm.Put(username, hp)
 	if hp.cfg.CheckUser(username, password) {
+		hp1 := hp.hub.Gm.Pop(username) // clear earlier register info
+		if hp1 != nil {
+			hp1.(*HubProtocol).Close()
+		}
 		hp.hub.Gm.Put(username, hp)
 		buf = append(buf, 1) // 1 success
 	} else {
