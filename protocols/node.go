@@ -53,7 +53,7 @@ func (np *NodeProtocol) Close() error {
 
 func (np *NodeProtocol) OnMessage(msg []byte) error {
 	switch msg[0] {
-	case 0x00: //注册请求包
+	case 0xff: //注册请求包
 		return np.Register()
 	case 0x11: // 心跳响应包
 		return np.onHeartBeatResponse(msg[1:])

@@ -131,7 +131,7 @@ func (hp *HubProtocol) OnMessage(msg []byte) error {
 }
 
 func (hp *HubProtocol) RequestRegister() error {
-	err := hp.Write([]byte{0x00})
+	err := hp.Write([]byte{0xff})
 	return err
 }
 
