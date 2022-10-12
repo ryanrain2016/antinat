@@ -151,7 +151,7 @@ func (hp *HubProtocol) onRegister(data []byte) error {
 	hp.username = username
 	if hp.cfg.CheckUser(username, password) {
 		hp1 := hp.hub.Gm.Pop(username) // clear earlier register info
-		if hp1 != nil {
+		if hp1 != nil && hp1 != hp {
 			hp1.(*HubProtocol).Close()
 		}
 		hp.hub.Gm.Put(username, hp)
