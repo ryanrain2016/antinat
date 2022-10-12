@@ -72,13 +72,16 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 		log.Error("node write connction request error")
 		return nil, errors.WithStack(err)
 	}
-	buf, err := np.ReadOneMessage()
-	if err != nil {
-		log.Error("node read conncetion response error")
-		return nil, errors.WithStack(err)
-	}
-	if buf[0] != 0x13 {
-		return nil, errors.WithStack(errors.New("expect connection response unexpect connection"))
+	var buf []byte
+	for {
+		buf, err = np.ReadOneMessage()
+		if err != nil {
+			log.Error("node read conncetion response error")
+			return nil, errors.WithStack(err)
+		}
+		if buf[0] == 0x13 {
+			break
+		}
 	}
 	log.Debug("node read a conncetion response")
 	raddr, err := np.onConnectionResponse(buf[1:])
