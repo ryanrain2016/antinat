@@ -108,6 +108,7 @@ func (h *Hub) Run() {
 			err = e.(error)
 			log.Error("server run error: %s", err.Error())
 		}
+		h.listener.Close()
 	}()
 	for {
 		var conn net.Conn

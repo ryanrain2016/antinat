@@ -4,6 +4,7 @@ import (
 	"antinat/config"
 	"antinat/log"
 	"antinat/protocols"
+	"time"
 )
 
 func main() {
@@ -23,6 +24,8 @@ func run() {
 				} else {
 					inst.Run()
 				}
+				log.Info("instance <%s> down, wait 5 seconds to restart..", inst)
+				time.Sleep(time.Second * 5)
 			}
 		}(v)
 	}

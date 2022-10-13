@@ -20,6 +20,7 @@ type NodeProtocol struct {
 	heartbeat       byte
 	heartbeatTicker *time.Ticker
 	heartbeatStop   chan int
+	heartbeatChan   chan byte
 	node            *Node
 }
 
@@ -31,6 +32,7 @@ func NewNodeProtocol(conn net.Conn, cfg *config.Config, node *Node) *NodeProtoco
 	np.heartbeat = 0
 	np.heartbeatTicker = time.NewTicker(time.Second * 30)
 	np.heartbeatStop = make(chan int, 1)
+	np.heartbeatChan = make(chan byte, 1)
 	np.node = node
 	np.loop = true
 	return np
@@ -205,24 +207,34 @@ func (np *NodeProtocol) Register() error {
 	return err
 }
 
-func (np *NodeProtocol) HeartBeat() {
-	np.heartbeat++
-	buf := append([]byte{0x01}, np.heartbeat)
+func (np *NodeProtocol) HeartBeat(b byte) {
+	buf := append([]byte{0x01}, b)
 	np.Write(buf)
+	t := time.NewTimer(time.Minute)
+	select {
+	case <-t.C:
+		log.Error("heartbeat timeout, closing")
+		np.Close()
+	case <-np.heartbeatChan:
+		t.Stop()
+	}
 }
 
 func (np *NodeProtocol) onHeartBeatResponse(buf []byte) error {
+	np.heartbeatChan <- buf[0]
 	if buf[0] == np.heartbeat {
 		return nil
 	}
-	return fmt.Errorf("wrong heartbeat read, perhaps the connection delay is to heavy")
+	np.Close()
+	return fmt.Errorf("wrong heartbeat read, closing")
 }
 
 func (np *NodeProtocol) StartHeartBeat() {
 	for {
 		select {
 		case <-np.heartbeatTicker.C:
-			go np.HeartBeat()
+			np.heartbeat++
+			go np.HeartBeat(np.heartbeat)
 		case <-np.heartbeatStop:
 			return
 		}

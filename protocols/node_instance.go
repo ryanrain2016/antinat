@@ -145,4 +145,5 @@ func (n *Node) Close() {
 	for _, l := range n.listeners {
 		l.Close()
 	}
+	n.conn.Close()
 }
