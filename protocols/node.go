@@ -230,6 +230,8 @@ func (np *NodeProtocol) onHeartBeatResponse(buf []byte) error {
 }
 
 func (np *NodeProtocol) StartHeartBeat() {
+	np.heartbeat++
+	go np.HeartBeat(np.heartbeat)
 	for {
 		select {
 		case <-np.heartbeatTicker.C:
