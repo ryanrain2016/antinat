@@ -82,6 +82,7 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 		if buf[0] == 0x13 {
 			break
 		}
+		log.Debug("node read a message, type is %d", buf[0])
 	}
 	log.Debug("node read a conncetion response")
 	raddr, err := np.onConnectionResponse(buf[1:])

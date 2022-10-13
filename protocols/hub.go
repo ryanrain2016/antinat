@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -70,7 +71,7 @@ func (h *Handler) Write(data []byte) error {
 	buf = append(buf, byte(size&0xff))
 	buf = append(buf, data...)
 	_, err := h.conn.Write(buf)
-	return err
+	return errors.WithStack(err)
 }
 
 type HubProtocol struct {
@@ -222,7 +223,10 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 		return errors.WithStack(errors.New("invalid connection response"))
 	}
 	log.Debug("find request conncetion from %s", hp1.conn.RemoteAddr())
-	defer hp1.Close()
+	defer func() {
+		time.Sleep(time.Second * 1)
+		hp1.Close()
+	}()
 	if data[0] == 0 {
 		hp1.Write([]byte{0x13, 0x00})
 		log.Debug("connect failed")
@@ -234,7 +238,7 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 	ipBytes, _ := utils.IP2Bytes(remoteAddr.IP)
 	buf = append(buf, ipBytes...)
 	buf = append(buf, utils.Port2Bytes(remoteAddr.Port)...)
-	log.Debug("hub write a success connection response")
+	log.Debug("hub write a success connection response to %s", hp1.conn.RemoteAddr())
 	return errors.WithStack(hp1.Write(buf))
 }
 
