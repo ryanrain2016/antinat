@@ -69,7 +69,12 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	}
 	connBytes = append(connBytes, nodeBytes...)
 	connBytes = append(connBytes, utils.Port2Bytes(port)...)
-	log.Debug("<%s> write connect requets to hub", n.cfg.GetInstanceName())
+	ips := n.cfg.GetExternalIps()
+	for _, ip := range ips {
+		ipBytes, _ := utils.IP2Bytes(ip)
+		connBytes = append(connBytes, ipBytes...)
+	}
+	log.Debug("<%s> write connect request to hub", n.cfg.GetInstanceName())
 	if err = np.Write(connBytes); err != nil {
 		log.Error("<%s> write connction request error", n.cfg.GetInstanceName())
 		return nil, errors.WithStack(err)
@@ -89,22 +94,22 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 			n.cfg.GetInstanceName(),
 			buf[0])
 	}
-	log.Debug("<%s> read a conncetion response", n.cfg.GetInstanceName())
+	log.Debug("<%s> read a connection response", n.cfg.GetInstanceName())
 	raddr, err := np.onConnectionResponse(buf[1:])
 	if err != nil {
-		log.Error("<%s> parse conncetion response error", n.cfg.GetInstanceName())
+		log.Error("<%s> parse connection response error", n.cfg.GetInstanceName())
 		return nil, errors.WithStack(err)
 	}
-	log.Debug("<%s>the oppsite node is behind <%s>", n.cfg.GetInstanceName(), raddr)
+	log.Debug("<%s> the oppsite node is behind <%s>", n.cfg.GetInstanceName(), raddr)
 	laddr := conn.LocalAddr()
 	np.Close()
-	log.Debug("<%s>start to connect to remote %s from %s", n.cfg.GetInstanceName(), raddr, laddr)
+	log.Debug("<%s> start to connect to remote %s from %s", n.cfg.GetInstanceName(), raddr, laddr)
 	_, newConn, err := n.cfg.CreateKcpConnection(raddr, laddr)
 	if err != nil {
-		log.Debug("<%s>connect failed to remote failed", n.cfg.GetInstanceName())
+		log.Debug("<%s> connect failed to remote failed", n.cfg.GetInstanceName())
 		return nil, errors.WithStack(err)
 	}
-	log.Debug("<%s>connected to remote %s from %s",
+	log.Debug("<%s> connected to remote %s from %s",
 		n.cfg.GetInstanceName(),
 		newConn.RemoteAddr(),
 		newConn.LocalAddr())
@@ -121,13 +126,13 @@ func (n *Node) HandlePortMap() {
 func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 	listener, err := net.Listen("tcp", pm.BindAddr)
 	if err != nil {
-		log.Error("<%s>handling port map listen on %s error: %s",
+		log.Error("<%s> handling port map listen on %s error: %s",
 			n.cfg.GetInstanceName(),
 			pm.BindAddr,
 			err.Error())
 		return
 	}
-	log.Info("<%s>Listen on %s to redirect to %s:%d",
+	log.Info("<%s> Listen on %s to redirect to %s:%d",
 		n.cfg.GetInstanceName(),
 		pm.BindAddr, pm.RemoteNode, pm.RemotePort)
 	n.listeners = append(n.listeners, listener)
@@ -141,7 +146,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 			defer func() { conn.Close() }()
 			rConn, err := n.Connect(pm.RemoteNode, pm.RemotePort)
 			if err != nil {
-				log.Error("<%s>connect to %s:%d error: %s",
+				log.Error("<%s> connect to %s:%d error: %s",
 					n.cfg.GetInstanceName(),
 					pm.RemoteNode, pm.RemotePort, err.Error())
 				return
@@ -150,7 +155,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 			go io.Copy(conn, rConn)
 			_, err = io.Copy(rConn, conn)
 			if err != nil {
-				log.Debug("<%s>error when pipe: %s",
+				log.Debug("<%s> error when pipe: %s",
 					n.cfg.GetInstanceName(),
 					err.Error())
 			}

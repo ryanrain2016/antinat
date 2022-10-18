@@ -431,3 +431,18 @@ func NewPortMap(name string, mapString string) (*PortMap, error) {
 	pm.RemotePort, _ = strconv.Atoi(parts[5])
 	return pm, nil
 }
+
+func (cfg *Config) GetExternalIps() []net.IP {
+	str, err := config.GetValue(cfg.instanceName, "external_ips")
+	if err != nil {
+		return []net.IP{}
+	}
+	ips := regexp.MustCompile(`\s*[,\\|:;/]\s*`).Split(str, -1)
+	IPs := make([]net.IP, 0)
+	for _, ip := range ips {
+		if IP := net.ParseIP(ip); IP != nil {
+			IPs = append(IPs, IP)
+		}
+	}
+	return IPs
+}

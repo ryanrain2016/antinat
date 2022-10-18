@@ -194,7 +194,7 @@ func (hp *HubProtocol) onConnection(data []byte) (err error) {
 		return errors.WithStack(err)
 	}
 	portBytes := data[:2]
-	rport, _, err := utils.ParsePort(data)
+	rport, data, err := utils.ParsePort(data)
 	if err != nil {
 		return errors.WithStack(err)
 	}
@@ -217,6 +217,7 @@ func (hp *HubProtocol) onConnection(data []byte) (err error) {
 	buf = append(buf, ipBytes...)
 	buf = append(buf, utils.Port2Bytes(addr.Port)...)
 	buf = append(buf, portBytes...)
+	buf = append(buf, data...)
 	remoteHp.Write(buf)
 	return nil
 }

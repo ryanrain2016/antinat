@@ -113,7 +113,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
-	localPort, _, err := utils.ParsePort(buf)
+	localPort, buf, err := utils.ParsePort(buf)
 	// raddr.IP = net.IP(buf[10:14])
 	// raddr.Port = (int(buf[14]) << 8) | int(buf[15])
 	// localPort := (int(buf[16]) << 8) | int(buf[17])
@@ -142,7 +142,8 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	log.Debug("<%s> connect to local<%s> done, start to make hole to %s",
 		np.cfg.GetInstanceName(),
 		lAddr, raddr)
-	np.MakeHole(udp, raddr)
+
+	np.MakeHole(udp, raddr, buf)
 	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
 	np1 := NewNodeProtocol(conn, np.cfg, np.node)
 	log.Debug("<%s> node write a success connection response", np.cfg.GetInstanceName())
@@ -279,11 +280,31 @@ func (np *NodeProtocol) StopHeartBeat() {
 	close(np.heartbeatStop)
 }
 
-func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr) {
-	for j := 0; j < 50; j++ {
-		n := rand.Intn(20) + 1
-		result := make([]byte, n)
-		rand.Read(result)
-		udp.WriteToUDP(result, raddr)
+func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr, ips []byte) {
+	makehole := func(udp *net.UDPConn, raddr *net.UDPAddr) {
+		for j := 0; j < 50; j++ {
+			n := rand.Intn(20) + 1
+			result := make([]byte, n)
+			rand.Read(result)
+			udp.WriteToUDP(result, raddr)
+		}
+	}
+	makehole(udp, raddr)
+	addr := &net.UDPAddr{
+		Port: raddr.Port,
+	}
+	ipString := raddr.IP.String()
+	var err error
+	var ip net.IP
+	for len(ips) > 0 {
+		ip, ips, err = utils.ParseIP(ips)
+		if err != nil {
+			break
+		}
+		if ip.String() == ipString {
+			continue
+		}
+		addr.IP = ip
+		makehole(udp, raddr)
 	}
 }
