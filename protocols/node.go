@@ -22,6 +22,7 @@ type NodeProtocol struct {
 	heartbeatStop   chan int
 	heartbeatChan   chan byte
 	node            *Node
+	closed          bool
 }
 
 func NewNodeProtocol(conn net.Conn, cfg *config.Config, node *Node) *NodeProtocol {
@@ -39,6 +40,11 @@ func NewNodeProtocol(conn net.Conn, cfg *config.Config, node *Node) *NodeProtoco
 }
 
 func (np *NodeProtocol) Close() error {
+	if !np.loop {
+		return nil
+	}
+	np.loop = false
+	log.Debug("<%s> <%s> close connection to hub", np.cfg.GetInstanceName(), np.conn.LocalAddr())
 	np.StopHeartBeat()
 	errors := make([]error, 0)
 	errors = append(errors, np.conn.Close())
@@ -68,7 +74,9 @@ func (np *NodeProtocol) OnMessage(msg []byte) error {
 	case 0x0a: // 控制台消息
 		return np.onControl(msg[1:])
 	default:
-		return fmt.Errorf("unsupport message type: %d", msg[0])
+		return fmt.Errorf("<%s>unsupport message type: %d",
+			np.cfg.GetInstanceName(),
+			msg[0])
 	}
 }
 
@@ -92,13 +100,17 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	raddr := new(net.UDPAddr)
 	raddr.IP, buf, err = utils.ParseIP(buf[10:])
 	if err != nil {
-		log.Error("parse IP error, when connect: %s", err.Error())
+		log.Error("<%s> parse IP error, when connect: %s",
+			np.cfg.GetInstanceName(),
+			err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
 	raddr.Port, buf, err = utils.ParsePort(buf)
 	if err != nil {
-		log.Error("parse port error, when connect: %s", err.Error())
+		log.Error("<%s> parse port error, when connect: %s",
+			np.cfg.GetInstanceName(),
+			err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
@@ -108,42 +120,54 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	// localPort := (int(buf[16]) << 8) | int(buf[17])
 	udp, conn, err := np.cfg.CreateConnectionToHub()
 	if err != nil {
-		log.Error("connect to hub error, when connect: %s", err.Error())
+		log.Error("<%s> connect to hub error, when connect: %s",
+			np.cfg.GetInstanceName(),
+			err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
 	defer func() { conn.Close() }()
 	localAddr := conn.LocalAddr().String()
 	lAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
-	log.Debug("connecting to local<%s>", lAddr)
+	log.Debug("<%s> connecting to local<%s>",
+		np.cfg.GetInstanceName(),
+		lAddr)
 	lConn, err := net.Dial("tcp", lAddr)
 	if err != nil {
-		log.Debug("connect to local %s , when connect: %s", lAddr, err.Error())
+		log.Debug("<%s> connect to local %s , when connect: %s",
+			np.cfg.GetInstanceName(),
+			lAddr, err.Error())
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
-	log.Debug("connect to local<%s> done, start to make hole to %s", lAddr, raddr)
+	log.Debug("<%s> connect to local<%s> done, start to make hole to %s",
+		np.cfg.GetInstanceName(),
+		lAddr, raddr)
 	np.MakeHole(udp, raddr)
 	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
 	np1 := NewNodeProtocol(conn, np.cfg, np.node)
-	log.Debug("node write a success connection response")
+	log.Debug("<%s> node write a success connection response", np.cfg.GetInstanceName())
 	err = np1.Write(connectResponseBytes)
 	if err != nil {
-		log.Error("send to connect response error")
+		log.Error("<%s> send to connect response error", np.cfg.GetInstanceName())
 		lConn.Close()
 		np1.Close()
 		return errors.WithStack(err)
 	}
-	log.Debug("node write response done")
+	log.Debug("<%s> node write response done", np.cfg.GetInstanceName())
 	go func() {
 		defer func() {
 			if e := recover(); e != nil {
 				err := e.(error)
-				log.Error("unexpect error when accept connection from other node: %+v", err)
+				log.Error("<%s> unexpect error when accept connection from other node: %+v",
+					np.cfg.GetInstanceName(),
+					err)
 			}
 		}()
 		defer lConn.Close()
-		log.Debug("start listen on %s...", localAddr)
+		log.Debug("<%s> start listen on %s...",
+			np.cfg.GetInstanceName(),
+			localAddr)
 		np1.Close()
 		listener, err := np.cfg.CreateListener(localAddr)
 		if err != nil {
@@ -157,7 +181,9 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 				panic(err)
 			}
 			remoteAddr := conn.RemoteAddr().String()
-			log.Debug("get a connection from %s, expect %s", remoteAddr, raddr)
+			log.Debug("<%s>get a connection from %s, expect %s",
+				np.cfg.GetInstanceName(),
+				remoteAddr, raddr)
 			hubAddr, _ := np.cfg.GetHubAddr()
 			if remoteAddr == hubAddr {
 				conn.Close()
@@ -166,7 +192,9 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 				break
 			}
 		}
-		log.Debug("accept a connection from %s", conn.RemoteAddr().String())
+		log.Debug("<%s>accept a connection from %s",
+			np.cfg.GetInstanceName(),
+			conn.RemoteAddr().String())
 		defer conn.Close()
 		go io.Copy(conn, lConn)
 		io.Copy(lConn, conn)
@@ -213,7 +241,7 @@ func (np *NodeProtocol) HeartBeat(b byte) {
 	t := time.NewTimer(time.Minute)
 	select {
 	case <-t.C:
-		log.Error("heartbeat timeout, closing")
+		log.Error("<%s>heartbeat timeout, closing", np.cfg.GetInstanceName())
 		np.Close()
 	case <-np.heartbeatChan:
 		t.Stop()
@@ -226,7 +254,7 @@ func (np *NodeProtocol) onHeartBeatResponse(buf []byte) error {
 		return nil
 	}
 	np.Close()
-	return fmt.Errorf("wrong heartbeat read, closing")
+	return fmt.Errorf("<%s>wrong heartbeat read, closing", np.cfg.GetInstanceName())
 }
 
 func (np *NodeProtocol) StartHeartBeat() {

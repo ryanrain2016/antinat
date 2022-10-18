@@ -35,11 +35,13 @@ func (h *Handler) Handle(mh MessageHandler) {
 	for h.loop {
 		buf, err := h.ReadOneMessage()
 		if err != nil {
-			log.Error("read message error: %s", err)
+			if h.loop {
+				log.Error("read message from <%s> error: %s", h.conn.RemoteAddr(), err)
+			}
 			return
 		}
 		if err = mh.OnMessage(buf); err != nil {
-			log.Error("handle message error: %+v", err)
+			log.Error("handle message from <%s> error: %+v", h.conn.RemoteAddr(), err)
 		}
 	}
 }
@@ -97,6 +99,11 @@ func (hp *HubProtocol) GetConn() net.Conn {
 }
 
 func (hp *HubProtocol) Close() error {
+	if !hp.loop {
+		return nil
+	}
+	hp.loop = false
+	log.Debug("<%s> close from <%s>", hp.cfg.GetInstanceName(), hp.conn.RemoteAddr())
 	errors := make([]error, 0)
 	errors = append(errors, hp.conn.Close())
 	for _, l := range hp.listeners {
@@ -127,7 +134,7 @@ func (hp *HubProtocol) OnMessage(msg []byte) error {
 	case 0x0a: // 控制台消息
 		return hp.onConsole(msg[1:])
 	default:
-		return fmt.Errorf("unsupport message type: %d", msg[0])
+		return fmt.Errorf("<%s>unsupport message type: %d", hp.cfg.GetInstanceName(), msg[0])
 	}
 }
 
@@ -157,8 +164,12 @@ func (hp *HubProtocol) onRegister(data []byte) error {
 		}
 		hp.hub.Gm.Put(username, hp)
 		buf = append(buf, 1) // 1 success
+		log.Debug("<%s> <%s> register success from <%s>",
+			hp.cfg.GetInstanceName(), username, hp.conn.RemoteAddr())
 	} else {
 		buf = append(buf, 0) // 0 failed
+		log.Debug("<%s> <%s> register failed from <%s>",
+			hp.cfg.GetInstanceName(), username, hp.conn.RemoteAddr())
 	}
 	return hp.Write(buf)
 }
@@ -215,30 +226,40 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 	// data[1:11] key
 	// if success; get hp.conn.RemoteAddr send to request node
 	// else send failed to request node
-	log.Debug("hub read a conncetion response")
+	log.Debug("<%s> read a conncetion response from <%s>",
+		hp.cfg.GetInstanceName(),
+		hp.conn.RemoteAddr())
 	key := string(data[1:11])
 	hp1, ok := hp.hub.Gm.Pop(key).(*HubProtocol)
 	if !ok || hp1 == nil {
-		log.Error("hub read connection response error, invalid key")
+		log.Error("<%s> read connection response error, invalid key", hp.cfg.GetInstanceName())
 		return errors.WithStack(errors.New("invalid connection response"))
 	}
-	log.Debug("find request conncetion from %s", hp1.conn.RemoteAddr())
+	log.Debug("<%s> find request conncetion from %s",
+		hp.cfg.GetInstanceName(),
+		hp1.conn.RemoteAddr())
 	defer func() {
 		time.Sleep(time.Second * 1)
 		hp1.Close()
 	}()
 	if data[0] == 0 {
 		hp1.Write([]byte{0x13, 0x00})
-		log.Debug("connect failed")
+		log.Debug("<%s> <%s> said connect failed",
+			hp.cfg.GetInstanceName(),
+			hp.conn.RemoteAddr())
 		return nil
 	}
-	log.Debug("hub read a success connection response")
+	log.Debug("<%s> read a success connection response from %s",
+		hp.cfg.GetInstanceName(),
+		hp.conn.RemoteAddr())
 	buf := []byte{0x13, 0x01}
 	remoteAddr, _ := hp.conn.RemoteAddr().(*net.UDPAddr)
 	ipBytes, _ := utils.IP2Bytes(remoteAddr.IP)
 	buf = append(buf, ipBytes...)
 	buf = append(buf, utils.Port2Bytes(remoteAddr.Port)...)
-	log.Debug("hub write a success connection response to %s", hp1.conn.RemoteAddr())
+	log.Debug("<%s> write a success connection response to %s",
+		hp.cfg.GetInstanceName(),
+		hp1.conn.RemoteAddr())
 	return errors.WithStack(hp1.Write(buf))
 }
 

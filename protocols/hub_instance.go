@@ -95,7 +95,7 @@ func (h *Hub) listen() (err error) {
 	var listener net.Listener
 	listener, err = h.cfg.CreateListener(bind_addr)
 	if err == nil {
-		log.Info("listening on [%s] ...", bind_addr)
+		log.Info("<%s>listening on [%s] ...", h.cfg.GetInstanceName(), bind_addr)
 		h.listener = listener
 	}
 	return err
@@ -106,7 +106,7 @@ func (h *Hub) Run() {
 	defer func() {
 		if e := recover(); e != nil {
 			err = e.(error)
-			log.Error("server run error: %s", err.Error())
+			log.Error("<%s>server run error: %s", h.cfg.GetInstanceName(), err.Error())
 		}
 		h.listener.Close()
 	}()
