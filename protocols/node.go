@@ -22,7 +22,6 @@ type NodeProtocol struct {
 	heartbeatStop   chan int
 	heartbeatChan   chan byte
 	node            *Node
-	closed          bool
 }
 
 func NewNodeProtocol(conn net.Conn, cfg *config.Config, node *Node) *NodeProtocol {
