@@ -289,7 +289,7 @@ func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr, ips []byt
 			udp.WriteToUDP(result, raddr)
 		}
 	}
-	makehole(udp, raddr)
+	go makehole(udp, raddr)
 	addr := &net.UDPAddr{
 		Port: raddr.Port,
 	}
@@ -305,6 +305,6 @@ func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr, ips []byt
 			continue
 		}
 		addr.IP = ip
-		makehole(udp, raddr)
+		makehole(udp, addr)
 	}
 }
