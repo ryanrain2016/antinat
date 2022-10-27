@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/xtaci/kcp-go"
 )
 
 type NodeProtocol struct {
@@ -198,6 +199,10 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		log.Debug("<%s>accept a connection from %s",
 			np.cfg.GetInstanceName(),
 			conn.RemoteAddr().String())
+		kcpConn := conn.(*kcp.UDPSession)
+		kcpConn.SetStreamMode(true)
+		kcpConn.SetACKNoDelay(true)
+		kcpConn.SetNoDelay(1, 10, 2, 1)
 		defer conn.Close()
 		go io.Copy(conn, lConn)
 		io.Copy(lConn, conn)

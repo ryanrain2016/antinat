@@ -329,6 +329,10 @@ func (cfg *Config) CreateConnectionToHub() (udp *net.UDPConn, conn net.Conn, err
 	} else {
 		conn, err = kcp.NewConn2(udpaddr, nil, 0, 0, udp)
 	}
+	kcpConn := conn.(*kcp.UDPSession)
+	kcpConn.SetStreamMode(true)
+	kcpConn.SetACKNoDelay(true)
+	kcpConn.SetNoDelay(1, 10, 2, 1)
 	if err == nil && tlsConfig != nil {
 		conn = tls.Client(conn, tlsConfig)
 	}
