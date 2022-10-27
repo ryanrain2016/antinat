@@ -189,6 +189,9 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 				conn.Close()
 				continue
 			} else {
+				buf := make([]byte, 1)
+				conn.Read(buf)
+				conn.Write(buf)
 				break
 			}
 		}

@@ -47,6 +47,7 @@ func (h *Handler) Handle(mh MessageHandler) {
 }
 
 func (h *Handler) ReadOneMessage() (buf []byte, err error) {
+	h.conn.SetReadDeadline(time.Now().Add(time.Minute))
 	buf = make([]byte, 2)
 	log.Trace("start read message length")
 	if _, err = io.ReadFull(h.conn, buf); err != nil {

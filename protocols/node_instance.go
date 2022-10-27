@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -113,6 +114,14 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 		n.cfg.GetInstanceName(),
 		newConn.RemoteAddr(),
 		newConn.LocalAddr())
+	buf = []byte{0xff}
+	newConn.Write(buf) // write a byte to comunicate
+	newConn.SetReadDeadline(time.Now().Add(time.Second * 10))
+	_, err = newConn.Read(buf)
+	if err != nil {
+		newConn.Close()
+		return nil, err
+	}
 	return newConn, err
 }
 
