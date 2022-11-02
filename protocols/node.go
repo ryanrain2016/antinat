@@ -299,7 +299,7 @@ func (np *NodeProtocol) StopHeartBeat() {
 
 func (np *NodeProtocol) MakeHole(udp *net.UDPConn, raddr *net.UDPAddr, ips []byte) {
 	makehole := func(udp *net.UDPConn, raddr *net.UDPAddr) {
-		for j := 0; j < 50; j++ {
+		for j := 0; j < 1; j++ {
 			n := rand.Intn(20) + 1
 			result := make([]byte, n)
 			rand.Read(result)
