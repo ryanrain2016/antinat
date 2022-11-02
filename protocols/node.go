@@ -140,7 +140,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
-	log.Debug("<%s> connect to local<%s> done, start to make hole to %s",
+	log.Debug("<%s> connect to local <%s> done, start to make hole to %s",
 		np.cfg.GetInstanceName(),
 		lAddr, raddr)
 
@@ -175,27 +175,36 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 			panic(err)
 		}
 		defer listener.Close()
-		var conn net.Conn
-		for {
-			conn, err = listener.Accept()
-			if err != nil {
-				panic(err)
-			}
-			remoteAddr := conn.RemoteAddr().String()
-			log.Debug("<%s>get a connection from %s, expect %s",
-				np.cfg.GetInstanceName(),
-				remoteAddr, raddr)
-			hubAddr, _ := np.cfg.GetHubAddr()
-			if remoteAddr == hubAddr {
-				conn.Close()
-				continue
-			} else {
-				buf := make([]byte, 1)
-				conn.Read(buf)
-				conn.Write(buf)
+		connCh := make(chan net.Conn, 1)
+		go func() {
+			for {
+				conn, err := listener.Accept()
+				if err != nil {
+					return
+				}
+				remoteAddr := conn.RemoteAddr().String()
+				log.Debug("<%s> get a connection from %s, expect %s",
+					np.cfg.GetInstanceName(),
+					remoteAddr, raddr)
+				hubAddr, _ := np.cfg.GetHubAddr()
+				if remoteAddr == hubAddr {
+					conn.Close()
+					continue
+				}
+				connCh <- conn
 				break
 			}
+		}()
+		select {
+		case <-time.After(time.Minute):
+			log.Error("<%s> timeout while waiting for connect", np.cfg.GetInstanceName())
+			return
+		case conn = <-connCh:
+			break
 		}
+		buf := make([]byte, 1)
+		conn.Read(buf)
+		conn.Write(buf)
 		log.Debug("<%s>accept a connection from %s",
 			np.cfg.GetInstanceName(),
 			conn.RemoteAddr().String())
