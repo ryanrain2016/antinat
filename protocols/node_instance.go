@@ -116,7 +116,8 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 		newConn.LocalAddr())
 	buf = []byte{0xff}
 	newConn.Write(buf) // write a byte to comunicate
-	newConn.SetReadDeadline(time.Now().Add(time.Second * 10))
+	timeout := n.cfg.GetNodeConnectTimeout()
+	newConn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
 	_, err = newConn.Read(buf)
 	if err != nil {
 		log.Error("<%s> handshake byte read timeout", n.cfg.GetInstanceName())

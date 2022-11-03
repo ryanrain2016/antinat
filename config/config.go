@@ -450,3 +450,32 @@ func (cfg *Config) GetExternalIps() []net.IP {
 	}
 	return IPs
 }
+
+func (cfg *Config) getInt(section, key string, deft int) int {
+	section = fmt.Sprintf("%s.%s", cfg.instanceName, section)
+	str, err := config.GetValue(section, key)
+	if err != nil {
+		return deft
+	}
+	n, err := strconv.Atoi(str)
+	if err != nil {
+		return deft
+	}
+	return n
+}
+
+func (cfg *Config) GetMakeholePacketNumber() int {
+	return cfg.getInt("connect", "makehole_packet_number", 1)
+}
+
+func (cfg *Config) GetMakeholePacketLength() int {
+	return cfg.getInt("connect", "makehole_packet_length", 20)
+}
+
+func (cfg *Config) GetNodeConnectTimeout() int {
+	return cfg.getInt("connect", "connect_timeout", 60)
+}
+
+func (cfg *Config) GetNodeListenTimeout() int {
+	return cfg.getInt("connect", "listen_timeout", 60)
+}
