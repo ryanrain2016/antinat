@@ -4,13 +4,19 @@ import (
 	"antinat/config"
 	"antinat/log"
 	"antinat/protocols"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
 func main() {
 	run()
-	ch := make(chan int)
-	<-ch
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	sig := <-sigs
+	fmt.Printf("recv signal [%v], quit\n", sig)
 }
 
 func run() {
