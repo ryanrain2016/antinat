@@ -243,7 +243,7 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 		hp.cfg.GetInstanceName(),
 		hp1.conn.RemoteAddr())
 	defer func() {
-		time.Sleep(time.Second * 1)
+		time.Sleep(time.Second * 2)
 		hp1.Close()
 	}()
 	if data[0] == 0 {
@@ -264,6 +264,7 @@ func (hp *HubProtocol) onConnectionResponse(data []byte) (err error) {
 	log.Debug("<%s> write a success connection response to %s",
 		hp.cfg.GetInstanceName(),
 		hp1.conn.RemoteAddr())
+	time.Sleep(time.Millisecond * 500)
 	return errors.WithStack(hp1.Write(buf))
 }
 
