@@ -134,6 +134,8 @@ func (hp *HubProtocol) OnMessage(msg []byte) error {
 		return hp.onConnectionResponse(msg[1:])
 	case 0x0a: // 控制台消息
 		return hp.onConsole(msg[1:])
+	case 0x09: // 打洞的 忽略
+		return nil
 	default:
 		return fmt.Errorf("<%s>unsupport message type: %d", hp.cfg.GetInstanceName(), msg[0])
 	}

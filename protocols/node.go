@@ -148,7 +148,8 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
 	np1 := NewNodeProtocol(conn, np.cfg, np.node)
 	log.Debug("<%s> node write a success connection response", np.cfg.GetInstanceName())
-	err = np1.Write(connectResponseBytes)
+	// err = np1.Write(connectResponseBytes)
+	err = np1.Write([]byte{0x00, 0x01, 0x09}) // 打洞消息，顺便hub会主动连接回来
 	if err != nil {
 		log.Error("<%s> send to connect response error", np.cfg.GetInstanceName())
 		lConn.Close()
@@ -188,7 +189,9 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 					remoteAddr, raddr)
 				hubAddr, _ := np.cfg.GetHubAddr()
 				if remoteAddr == hubAddr {
-					conn.Close()
+					np1 := NewNodeProtocol(conn, np.cfg, np.node)
+					defer np1.Close()
+					np1.Write(connectResponseBytes)
 					continue
 				}
 				connCh <- conn
