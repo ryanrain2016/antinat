@@ -196,16 +196,16 @@ func (hp *HubProtocol) onConnection(data []byte) (err error) {
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	portBytes := data[:2]
-	rport, data, err := utils.ParsePort(data)
+	// portBytes := data[:2]
+	// rport, data, err := utils.ParsePort(data)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	log.Info("<%s> connection from <%s> to <%s>:<%d>",
+	log.Info("<%s> connection from <%s> to <%s>",
 		hp.cfg.GetInstanceName(),
 		hp.conn.RemoteAddr().String(),
 		node,
-		rport,
+		// rport,
 	)
 	remoteHpI := hp.hub.Gm.Get(node)
 	if remoteHpI == nil {
@@ -219,7 +219,7 @@ func (hp *HubProtocol) onConnection(data []byte) (err error) {
 	ipBytes, _ := utils.IP2Bytes(addr.IP)
 	buf = append(buf, ipBytes...)
 	buf = append(buf, utils.Port2Bytes(addr.Port)...)
-	buf = append(buf, portBytes...)
+	// buf = append(buf, portBytes...)
 	buf = append(buf, data...)
 	remoteHp.Write(buf)
 	return nil
