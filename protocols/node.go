@@ -3,9 +3,9 @@ package protocols
 import (
 	"antinat/config"
 	"antinat/log"
+	"antinat/multiplexer"
 	"antinat/utils"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"time"
@@ -114,7 +114,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		np.onConnectionFailed(key)
 		return errors.WithStack(err)
 	}
-	localPort, buf, err := utils.ParsePort(buf)
+	// localPort, buf, err := utils.ParsePort(buf)
 	// raddr.IP = net.IP(buf[10:14])
 	// raddr.Port = (int(buf[14]) << 8) | int(buf[15])
 	// localPort := (int(buf[16]) << 8) | int(buf[17])
@@ -128,21 +128,21 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	}
 	defer func() { conn.Close() }()
 	localAddr := conn.LocalAddr().String()
-	lAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
-	log.Debug("<%s> connecting to local<%s>",
-		np.cfg.GetInstanceName(),
-		lAddr)
-	lConn, err := net.Dial("tcp", lAddr)
-	if err != nil {
-		log.Debug("<%s> connect to local %s , when connect: %s",
-			np.cfg.GetInstanceName(),
-			lAddr, err.Error())
-		np.onConnectionFailed(key)
-		return errors.WithStack(err)
-	}
-	log.Debug("<%s> connect to local <%s> done, start to make hole to %s",
-		np.cfg.GetInstanceName(),
-		lAddr, raddr)
+	// lAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	// log.Debug("<%s> connecting to local<%s>",
+	// 	np.cfg.GetInstanceName(),
+	// 	lAddr)
+	// lConn, err := net.Dial("tcp", lAddr)
+	// if err != nil {
+	// 	log.Debug("<%s> connect to local %s , when connect: %s",
+	// 		np.cfg.GetInstanceName(),
+	// 		lAddr, err.Error())
+	// 	np.onConnectionFailed(key)
+	// 	return errors.WithStack(err)
+	// }
+	// log.Debug("<%s> connect to local <%s> done, start to make hole to %s",
+	// 	np.cfg.GetInstanceName(),
+	// 	lAddr, raddr)
 
 	np.MakeHole(udp, raddr, buf)
 	connectResponseBytes := append([]byte{0x13, 0x01}, key...)
@@ -152,7 +152,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 	// err = np1.Write([]byte{0x09}) // 打洞消息，顺便hub会主动连接回来
 	if err != nil {
 		log.Error("<%s> send to connect response error", np.cfg.GetInstanceName())
-		lConn.Close()
+		// lConn.Close()
 		np1.Close()
 		return errors.WithStack(err)
 	}
@@ -166,7 +166,7 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 					err)
 			}
 		}()
-		defer lConn.Close()
+		// defer lConn.Close()
 		log.Debug("<%s> start listen on %s...",
 			np.cfg.GetInstanceName(),
 			localAddr)
@@ -217,9 +217,15 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		kcpConn.SetStreamMode(true)
 		kcpConn.SetACKNoDelay(true)
 		kcpConn.SetNoDelay(1, 10, 2, 1)
-		defer conn.Close()
-		go io.Copy(conn, lConn)
-		io.Copy(lConn, conn)
+		// defer conn.Close()
+		// go io.Copy(conn, lConn)
+		// io.Copy(lConn, conn)
+		// TODO do something with conn
+		var m multiplexer.Multiplexer
+		m = multiplexer.NewMultiplexer(conn, np.cfg.GetInstanceName(), 256, func(remoteName string) error {
+			return np.node.MultiplexerManager.AddMultiplexer(remoteName, m)
+		})
+		m.Poll()
 	}()
 	return nil
 }

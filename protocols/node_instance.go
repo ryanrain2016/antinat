@@ -3,9 +3,9 @@ package protocols
 import (
 	"antinat/config"
 	"antinat/log"
+	"antinat/multiplexer"
 	"antinat/utils"
 	"fmt"
-	"io"
 	"net"
 	"time"
 
@@ -17,6 +17,8 @@ type Node struct {
 	conn      net.Conn
 	Gm        *GlobalMap
 	listeners []net.Listener
+
+	MultiplexerManager multiplexer.MultiplexerManager
 }
 
 func NewNode(cfg *config.Config) (n *Node, err error) {
@@ -32,6 +34,7 @@ func NewNode(cfg *config.Config) (n *Node, err error) {
 		lock:  make(chan int, 1),
 		inner: make(map[string]interface{}),
 	}
+	n.MultiplexerManager = multiplexer.NewMultiplexerManager(cfg.GetInstanceName(), n.ConnectionFactory)
 	return
 }
 
@@ -53,7 +56,7 @@ func (n *Node) Run() {
 	np.Handle(np)
 }
 
-func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
+func (n *Node) ConnectionFactory(remoteName string) (net.Conn, error) {
 	log.Debug("<%s> create a new connetion to hub", n.cfg.GetInstanceName())
 	_, conn, err := n.cfg.CreateConnectionToHub()
 	if err != nil {
@@ -61,15 +64,15 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	}
 	defer func() { conn.Close() }()
 	np := NewNodeProtocol(conn, n.cfg, n)
-	auth := n.cfg.GetAuth() // if auth is nil, panic occurs when register
+	// create connect bytes
+	auth := n.cfg.GetAuth()
 	authBytes := auth.ToBytes()
 	connBytes := append([]byte{0x03}, authBytes...)
-	nodeBytes, err := utils.String2Bytes(nodeName)
+	nodeBytes, err := utils.String2Bytes(remoteName)
 	if err != nil {
-		return nil, errors.WithStack(fmt.Errorf("node name is to long: %s", nodeName))
+		return nil, errors.WithStack(fmt.Errorf("node name is to long: %s", remoteName))
 	}
 	connBytes = append(connBytes, nodeBytes...)
-	connBytes = append(connBytes, utils.Port2Bytes(port)...)
 	ips := n.cfg.GetExternalIps()
 	for _, ip := range ips {
 		ipBytes, _ := utils.IP2Bytes(ip)
@@ -83,12 +86,12 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 	var buf []byte
 	for {
 		buf, err = np.ReadOneMessage()
-		if err != nil {
+		if err != nil { // 这里是超时错误
 			log.Error("<%s> read conncetion response error",
 				n.cfg.GetInstanceName())
 			return nil, errors.WithStack(err)
 		}
-		if buf[0] == 0x13 {
+		if buf[0] == 0x13 { // 这里收到响应信息跳出
 			break
 		}
 		log.Debug("<%s> read a message, type is %d",
@@ -101,7 +104,7 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 		log.Error("<%s> parse connection response error", n.cfg.GetInstanceName())
 		return nil, errors.WithStack(err)
 	}
-	log.Debug("<%s> the oppsite node is behind <%s>", n.cfg.GetInstanceName(), raddr)
+	log.Debug("<%s> the opposite node is behind <%s>", n.cfg.GetInstanceName(), raddr)
 	laddr := conn.LocalAddr()
 	np.Close()
 	log.Debug("<%s> start to connect to remote %s from %s", n.cfg.GetInstanceName(), raddr, laddr)
@@ -115,7 +118,7 @@ func (n *Node) Connect(nodeName string, port int) (net.Conn, error) {
 		newConn.RemoteAddr(),
 		newConn.LocalAddr())
 	buf = []byte{0xff}
-	newConn.Write(buf) // write a byte to comunicate
+	newConn.Write(buf) // write a byte to communicate
 	timeout := n.cfg.GetNodeConnectTimeout()
 	newConn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(timeout)))
 	_, err = newConn.Read(buf)
@@ -156,21 +159,16 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 		}
 		go func() {
 			defer func() { conn.Close() }()
-			rConn, err := n.Connect(pm.RemoteNode, pm.RemotePort)
+			multiplexer, err := n.MultiplexerManager.GetMultiplexer(pm.RemoteNode, 256)
 			if err != nil {
 				log.Error("<%s> connect to %s:%d error: %s",
 					n.cfg.GetInstanceName(),
 					pm.RemoteNode, pm.RemotePort, err.Error())
 				return
 			}
-			defer func() { rConn.Close() }()
-			go io.Copy(conn, rConn)
-			_, err = io.Copy(rConn, conn)
-			if err != nil {
-				log.Debug("<%s> error when pipe: %s",
-					n.cfg.GetInstanceName(),
-					err.Error())
-			}
+			ch, _ := multiplexer.GetChannel(conn)
+			ch.Connect(fmt.Sprintf("127.0.0.1:%d", pm.RemotePort))
+			ch.Poll()
 		}()
 	}
 }
