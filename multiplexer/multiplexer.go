@@ -68,6 +68,7 @@ func (mm *multiplexerManager) GetMultiplexer(remoteName string, bufferSize int) 
 		}
 		v = NewMultiplexer(conn, mm.name, bufferSize, nil)
 		go v.StartHeartBeat()
+		go v.SendHandShake()
 		go v.Poll()
 		mm.multiplexerMap[remoteName] = v
 	}
