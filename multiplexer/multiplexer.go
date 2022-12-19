@@ -119,14 +119,14 @@ func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallba
 func (m *multiplexer) Write(sessionId uint32, b []byte) (n int, err error) {
 	m.writeMutex.Lock()
 	defer m.writeMutex.Unlock()
-	for len(b) > 1500 {
-		err = m.writeMessage(sessionId, 0x02, b[:1500])
-		if err != nil {
-			return n, errors.WithStack(err)
-		}
-		n += 1500
-		b = b[1500:]
-	}
+	// for len(b) > 1500 {
+	// 	err = m.writeMessage(sessionId, 0x02, b[:1500])
+	// 	if err != nil {
+	// 		return n, errors.WithStack(err)
+	// 	}
+	// 	n += 1500
+	// 	b = b[1500:]
+	// }
 	err = m.writeMessage(sessionId, 0x02, b)
 	if err != nil {
 		return n, errors.WithStack(err)
