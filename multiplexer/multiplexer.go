@@ -119,14 +119,14 @@ func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallba
 func (m *multiplexer) Write(sessionId uint32, b []byte) (n int, err error) {
 	m.writeMutex.Lock()
 	defer m.writeMutex.Unlock()
-	// for len(b) > 1500 {
-	// 	err = m.writeMessage(sessionId, 0x02, b[:1500])
-	// 	if err != nil {
-	// 		return n, errors.WithStack(err)
-	// 	}
-	// 	n += 1500
-	// 	b = b[1500:]
-	// }
+	for len(b) > 0xffff {
+		err = m.writeMessage(sessionId, 0x02, b[:0xffff])
+		if err != nil {
+			return n, errors.WithStack(err)
+		}
+		n += 0xffff
+		b = b[0xffff:]
+	}
 	err = m.writeMessage(sessionId, 0x02, b)
 	if err != nil {
 		return n, errors.WithStack(err)
@@ -318,8 +318,9 @@ func (m *multiplexer) handleMessage(sessionId uint32, cbyte byte, msg []byte) er
 	case 0x03: // 关闭连接
 		m.closeSession(sessionId)
 	case 0xff: // 心跳
-		buf := []byte{0x00, 0x00, 0x00, 0x00, 0xfe, 0x00, 0x01, msg[0]}
-		m.conn.Write(buf)
+		// buf := []byte{0x00, 0x00, 0x00, 0x00, 0xfe, 0x00, 0x01, msg[0]}
+		// m.conn.Write(buf)
+		m.writeMessage(sessionId, 0xfe, msg)
 	case 0xfe: // 心跳响应
 		m.heartbeatChan <- msg[0]
 		if msg[0] != m.heartbeat {
@@ -398,8 +399,9 @@ func (m *multiplexer) SendClose(sessionId uint32) error {
 }
 
 func (m *multiplexer) heartBeat(b byte) {
-	buf := []byte{0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0x01, b}
-	m.conn.Write(buf)
+	// buf := []byte{0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0x01, b}
+	// m.conn.Write(buf)
+	m.writeMessage(0, 0xff, []byte{b})
 	t := time.NewTimer(time.Minute)
 	select {
 	case <-t.C:
