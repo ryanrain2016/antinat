@@ -168,7 +168,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 			}
 			ch, _ := multiplexer.GetChannel(conn)
 			ch.Connect(fmt.Sprintf("127.0.0.1:%d", pm.RemotePort))
-			ch.Poll()
+			// ch.Poll() 这里不要poll，连接响应的时候决定是否需要poll
 		}()
 	}
 }

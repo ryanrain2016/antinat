@@ -1,7 +1,6 @@
 package multiplexer
 
 import (
-	"antinat/log"
 	"net"
 
 	"github.com/pkg/errors"
@@ -69,7 +68,6 @@ func (c *channel) Poll() error {
 			return errors.WithStack(err)
 		}
 		b = b[:n]
-		log.Trace("channel read write to remote: %s", string(b))
 		_, err = c.Write(b)
 		if err != nil {
 			return errors.WithStack(err)
