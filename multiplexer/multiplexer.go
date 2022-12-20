@@ -1,6 +1,7 @@
 package multiplexer
 
 import (
+	"antinat/log"
 	"crypto/rand"
 	"io"
 	"math/big"
@@ -47,8 +48,11 @@ func (mm *multiplexerManager) AddMultiplexer(remoteName string, multiplexer Mult
 	locker := mm.getMultiplexerMapLocker(remoteName)
 	locker.Lock()
 	defer locker.Unlock()
-	if _, ok := mm.multiplexerMap[remoteName]; ok {
-		return errors.WithStack(errors.Errorf("multiplexer exists"))
+	if m, ok := mm.multiplexerMap[remoteName]; ok {
+		log.Warning("multiplexer exists")
+		if m.IsValid() {
+			return errors.WithStack(errors.Errorf("multiplexer exists"))
+		}
 	}
 	mm.multiplexerMap[remoteName] = multiplexer
 	return nil

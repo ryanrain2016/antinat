@@ -48,6 +48,7 @@ func (c *channel) Connect(addr string) error {
 }
 
 func (c *channel) Poll() error {
+	defer c.Close()
 	go func() {
 		for c.loop {
 			b, ok := <-c.writeChannel
