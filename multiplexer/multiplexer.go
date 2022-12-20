@@ -375,7 +375,7 @@ func (m *multiplexer) handleConnect(sessionId uint32, msg []byte) error {
 		resp = 0
 		return errors.WithStack(err)
 	}
-	log.Debug("session [%s] is ready to poll")
+	log.Debug("session [%s] is ready to poll", sessionId)
 	go ch.Poll()
 	return nil
 }
