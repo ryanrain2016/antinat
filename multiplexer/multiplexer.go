@@ -81,6 +81,15 @@ func (mm *multiplexerManager) GetMultiplexer(remoteName string, bufferSize int) 
 	return v, nil
 }
 
+func (mm *multiplexerManager) Close() error {
+	mm.multiplexerMapLock.Lock()
+	defer mm.multiplexerMapLock.Unlock()
+	for _, m := range mm.multiplexerMap {
+		m.Close()
+	}
+	return nil
+}
+
 type multiplexer struct {
 	conn         net.Conn
 	channels     map[uint32]Channel

@@ -8,6 +8,7 @@ import (
 type MultiplexerManager interface {
 	GetMultiplexer(remoteName string, bufferSize int) (Multiplexer, error)
 	AddMultiplexer(remoteName string, multiplexer Multiplexer) error
+	Close() error
 }
 
 type Multiplexer interface {

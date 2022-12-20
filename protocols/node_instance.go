@@ -178,4 +178,5 @@ func (n *Node) Close() {
 		l.Close()
 	}
 	n.conn.Close()
+	n.MultiplexerManager.Close()
 }
