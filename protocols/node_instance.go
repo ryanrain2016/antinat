@@ -149,7 +149,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 	}
 	log.Info("<%s> Listen on %s to redirect to %s:%d",
 		n.cfg.GetInstanceName(),
-		pm.BindAddr, pm.RemoteNode, pm.RemotePort)
+		pm.BindAddr, pm.RemoteNode, pm.RemoteAddr)
 	n.listeners = append(n.listeners, listener)
 	defer func() { listener.Close() }()
 	for {
@@ -163,11 +163,11 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 			if err != nil {
 				log.Error("<%s> connect to %s:%d error: %s",
 					n.cfg.GetInstanceName(),
-					pm.RemoteNode, pm.RemotePort, err.Error())
+					pm.RemoteNode, pm.RemoteAddr, err.Error())
 				return
 			}
 			ch, _ := multiplexer.GetChannel(conn)
-			ch.Connect(fmt.Sprintf("127.0.0.1:%d", pm.RemotePort))
+			ch.Connect(pm.RemoteAddr)
 			// ch.Poll() 这里不要poll，连接响应的时候决定是否需要poll
 		}()
 	}

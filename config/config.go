@@ -415,11 +415,11 @@ type PortMap struct {
 	Name       string
 	BindAddr   string
 	RemoteNode string
-	RemotePort int
+	RemoteAddr string
 }
 
 func NewPortMap(name string, mapString string) (*PortMap, error) {
-	reg := regexp.MustCompile(`((?:(\d+\.\d+\.\d+\.\d+):)?(\d+))\s*[-/;|]\s*([^:]+):(\d+)`)
+	reg := regexp.MustCompile(`((?:(\d+\.\d+\.\d+\.\d+):)?(\d+))\s*[-/;|]\s*([^:]+):(.+)`)
 	parts := reg.FindStringSubmatch(mapString)
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("invalid config[%s], skip", mapString)
@@ -432,7 +432,11 @@ func NewPortMap(name string, mapString string) (*PortMap, error) {
 		pm.BindAddr = parts[1]
 	}
 	pm.RemoteNode = parts[4]
-	pm.RemotePort, _ = strconv.Atoi(parts[5])
+	if _, err := strconv.Atoi(parts[5]); err != nil {
+		pm.RemoteAddr = parts[5]
+	} else {
+		pm.RemoteAddr = fmt.Sprintf("127.0.0.1:%s", parts[5])
+	}
 	return pm, nil
 }
 
