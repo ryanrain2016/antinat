@@ -1,6 +1,7 @@
 package multiplexer
 
 import (
+	"antinat/log"
 	"crypto/rand"
 	"io"
 	"math/big"
@@ -66,7 +67,9 @@ func (mm *multiplexerManager) GetMultiplexer(remoteName string, bufferSize int) 
 		if err != nil {
 			return nil, errors.WithStack(err)
 		}
-		v = NewMultiplexer(conn, mm.name, bufferSize, nil)
+		v = NewMultiplexer(conn, mm.name, bufferSize, func(remoteName string, m Multiplexer) error {
+			return mm.AddMultiplexer(remoteName, m)
+		})
 		go v.StartHeartBeat()
 		go v.SendHandShake()
 		go v.Poll()
@@ -86,7 +89,7 @@ type multiplexer struct {
 	writeChannel chan []byte
 
 	// 获取到对方的节点name时调用，主要是要添加到multiplexerManager中
-	remoteNameCallback func(remoteName string) error
+	remoteNameCallback func(remoteName string, m Multiplexer) error
 
 	heartbeat       byte
 	heartbeatTicker *time.Ticker
@@ -96,7 +99,7 @@ type multiplexer struct {
 	loop bool
 }
 
-func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallback func(remoteName string) error) Multiplexer {
+func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallback func(remoteName string, m Multiplexer) error) Multiplexer {
 	return &multiplexer{
 		conn:         conn,
 		channels:     make(map[uint32]Channel),
@@ -161,7 +164,9 @@ func (m *multiplexer) AddChannel(sessionId uint32, ch Channel) error {
 	m.channelMutex.Lock()
 	defer m.channelMutex.Unlock()
 	if _, ok := m.channels[sessionId]; ok {
-		return errors.WithStack(errors.Errorf("session exists: %s", sessionId))
+		// 两边sessionId应该是一样的，这边存在的话也应该是无效的
+		// return errors.WithStack(errors.Errorf("session exists: %s", sessionId))
+		m.closeSession(sessionId)
 	}
 	m.channels[sessionId] = ch
 	return nil
@@ -294,7 +299,7 @@ func (m *multiplexer) handleMessage(sessionId uint32, cbyte byte, msg []byte) er
 			return errors.WithStack(err)
 		}
 		if m.remoteNameCallback != nil {
-			err = m.remoteNameCallback(name)
+			err = m.remoteNameCallback(name, m)
 			if err != nil {
 				return errors.WithStack(err)
 			}
@@ -336,6 +341,7 @@ func (m *multiplexer) handleMessage(sessionId uint32, cbyte byte, msg []byte) er
 			return errors.WithStack(errors.Errorf("unknown sessionId: %d", sessionId))
 		}
 		if msg[0] == 1 {
+			log.Debug("session[%d] connected successfully, start to poll", sessionId)
 			go ch.Poll()
 		} else {
 			m.closeSession(sessionId)
@@ -369,6 +375,7 @@ func (m *multiplexer) handleConnect(sessionId uint32, msg []byte) error {
 		resp = 0
 		return errors.WithStack(err)
 	}
+	log.Debug("session [%s] is ready to poll")
 	go ch.Poll()
 	return nil
 }

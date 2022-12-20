@@ -221,11 +221,11 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 		// go io.Copy(conn, lConn)
 		// io.Copy(lConn, conn)
 		// TODO do something with conn
-		var m multiplexer.Multiplexer
-		m = multiplexer.NewMultiplexer(conn, np.cfg.GetInstanceName(), 256, func(remoteName string) error {
+		v := multiplexer.NewMultiplexer(conn, np.cfg.GetInstanceName(), 256, func(remoteName string, m multiplexer.Multiplexer) error {
+			log.Info("connect to %s created", remoteName)
 			return np.node.MultiplexerManager.AddMultiplexer(remoteName, m)
 		})
-		m.Poll()
+		v.Poll()
 	}()
 	return nil
 }
