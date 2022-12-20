@@ -1,7 +1,6 @@
 package multiplexer
 
 import (
-	"antinat/log"
 	"crypto/rand"
 	"io"
 	"math/big"
@@ -341,7 +340,6 @@ func (m *multiplexer) handleMessage(sessionId uint32, cbyte byte, msg []byte) er
 			return errors.WithStack(errors.Errorf("unknown sessionId: %d", sessionId))
 		}
 		if msg[0] == 1 {
-			log.Debug("session[%d] connected successfully, start to poll", sessionId)
 			go ch.Poll()
 		} else {
 			m.closeSession(sessionId)
@@ -375,7 +373,6 @@ func (m *multiplexer) handleConnect(sessionId uint32, msg []byte) error {
 		resp = 0
 		return errors.WithStack(err)
 	}
-	log.Debug("session [%s] is ready to poll", sessionId)
 	go ch.Poll()
 	return nil
 }
