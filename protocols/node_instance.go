@@ -159,7 +159,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 		}
 		go func() {
 			// defer func() { conn.Close() }() // conn 的关闭交给channel了
-			multiplexer, err := n.MultiplexerManager.GetMultiplexer(pm.RemoteNode, 256)
+			multiplexer, err := n.MultiplexerManager.GetMultiplexer(pm.RemoteNode, 5)
 			if err != nil {
 				log.Error("<%s> connect to %s:%d error: %s",
 					n.cfg.GetInstanceName(),

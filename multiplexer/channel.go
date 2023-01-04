@@ -2,6 +2,7 @@ package multiplexer
 
 import (
 	"net"
+	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -13,6 +14,9 @@ type channel struct {
 
 	writeChannel chan []byte
 	loop         bool
+
+	pollMutex sync.Locker
+	polling bool
 }
 
 func (c *channel) Write(b []byte) (n int, err error) {
@@ -48,6 +52,18 @@ func (c *channel) Connect(addr string) error {
 }
 
 func (c *channel) Poll() error {
+	poll := func() bool {
+		c.pollMutex.Lock()
+		defer c.pollMutex.Unlock()
+		defer func() {
+			c.polling = true
+		}()
+		p := c.polling
+		return p
+	}()
+	if poll {
+		return errors.WithStack(errors.Errorf("channle has already been polling"))
+	}
 	defer c.Close()
 	go func() {
 		for c.loop {

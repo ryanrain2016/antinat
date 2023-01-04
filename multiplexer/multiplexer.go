@@ -109,6 +109,9 @@ type multiplexer struct {
 	heartbeatChan   chan byte
 
 	loop bool
+
+	pollMutex sync.Locker
+	polling bool
 }
 
 func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallback func(remoteName string, m Multiplexer) error) Multiplexer {
@@ -127,6 +130,9 @@ func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallba
 		heartbeatChan:   make(chan byte, 1),
 
 		loop: true,
+
+		polling: false,
+		pollMutex: &sync.Mutex{},
 	}
 }
 
@@ -167,6 +173,9 @@ func (m *multiplexer) GetChannel(conn net.Conn) (ch Channel, err error) {
 		multiplexer:  m,
 		writeChannel: make(chan []byte, 256),
 		loop:         true,
+
+		polling: false,
+		pollMutex: &sync.Mutex{},
 	}
 	m.channels[sessionId] = ch
 	return
@@ -263,6 +272,18 @@ func (m *multiplexer) IsValid() bool {
 }
 
 func (m *multiplexer) Poll() error {
+	poll := func() bool {
+		m.pollMutex.Lock()
+		defer m.pollMutex.Unlock()
+		defer func() {
+			m.polling = true
+		}()
+		p := m.polling
+		return p
+	}()
+	if poll {
+		return errors.WithStack(errors.Errorf("channle has already been polling"))
+	}
 	defer m.Close()
 	go func() {
 		defer func() {
@@ -381,6 +402,9 @@ func (m *multiplexer) handleConnect(sessionId uint32, msg []byte) error {
 		multiplexer:  m,
 		writeChannel: make(chan []byte, 256),
 		loop:         true,
+
+		polling: false,
+		pollMutex: &sync.Mutex{},
 	}
 	if err = m.AddChannel(sessionId, ch); err != nil {
 		resp = 0
