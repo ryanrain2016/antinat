@@ -97,7 +97,7 @@ type multiplexer struct {
 
 	name string // 本地节点名称
 
-	writeMutex   sync.Locker
+	// writeMutex   sync.Locker
 	writeChannel chan []byte
 
 	// 获取到对方的节点name时调用，主要是要添加到multiplexerManager中
@@ -120,7 +120,7 @@ func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallba
 		channels:     make(map[uint32]Channel),
 		channelMutex: &sync.Mutex{},
 		name:         name,
-		writeMutex:   &sync.Mutex{},
+		// writeMutex:   &sync.Mutex{},
 		writeChannel: make(chan []byte, bufferSize),
 
 		remoteNameCallback: remoteNameCallback,
@@ -138,8 +138,8 @@ func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallba
 
 // 从 sessionId 会话 对应的channel 发送信息到远方
 func (m *multiplexer) Write(sessionId uint32, b []byte) (n int, err error) {
-	m.writeMutex.Lock()
-	defer m.writeMutex.Unlock()
+	// m.writeMutex.Lock()
+	// defer m.writeMutex.Unlock()
 	for len(b) > 0xffff {
 		err = m.writeMessage(sessionId, 0x02, b[:0xffff])
 		if err != nil {
