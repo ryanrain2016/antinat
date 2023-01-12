@@ -111,7 +111,7 @@ type multiplexer struct {
 	loop bool
 
 	pollMutex sync.Locker
-	polling bool
+	polling   bool
 }
 
 func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallback func(remoteName string, m Multiplexer) error) Multiplexer {
@@ -131,7 +131,7 @@ func NewMultiplexer(conn net.Conn, name string, bufferSize int, remoteNameCallba
 
 		loop: true,
 
-		polling: false,
+		polling:   false,
 		pollMutex: &sync.Mutex{},
 	}
 }
@@ -174,7 +174,7 @@ func (m *multiplexer) GetChannel(conn net.Conn) (ch Channel, err error) {
 		writeChannel: make(chan []byte, 256),
 		loop:         true,
 
-		polling: false,
+		polling:   false,
 		pollMutex: &sync.Mutex{},
 	}
 	m.channels[sessionId] = ch
@@ -250,11 +250,7 @@ func (m *multiplexer) ReadOneMessage() (sessionId uint32, cbyte byte, msg []byte
 	return
 }
 
-func (m *multiplexer) writeMessage(sessionId uint32, cbyte byte, msg []byte) (err error) {
-	defer func() {
-		e := recover()
-		err, _ = e.(error)
-	}()
+func (m *multiplexer) formMessage(sessionId uint32, cbyte byte, msg []byte) []byte {
 	buf := sessionId2Bytes(sessionId)
 	buf = append(buf, cbyte)
 	if msg != nil {
@@ -263,6 +259,15 @@ func (m *multiplexer) writeMessage(sessionId uint32, cbyte byte, msg []byte) (er
 	} else {
 		buf = append(buf, 0x00, 0x00)
 	}
+	return buf
+}
+
+func (m *multiplexer) writeMessage(sessionId uint32, cbyte byte, msg []byte) (err error) {
+	defer func() {
+		e := recover()
+		err, _ = e.(error)
+	}()
+	buf := m.formMessage(sessionId, cbyte, msg)
 	m.writeChannel <- buf
 	return
 }
@@ -403,7 +408,7 @@ func (m *multiplexer) handleConnect(sessionId uint32, msg []byte) error {
 		writeChannel: make(chan []byte, 256),
 		loop:         true,
 
-		polling: false,
+		polling:   false,
 		pollMutex: &sync.Mutex{},
 	}
 	if err = m.AddChannel(sessionId, ch); err != nil {
@@ -427,7 +432,9 @@ func (m *multiplexer) closeSession(sessionId uint32) error {
 
 func (m *multiplexer) SendHandShake() error {
 	nameBytes := []byte(m.name)
-	return m.writeMessage(0, 0x00, append(length2Bytes(len(nameBytes)), nameBytes...))
+	buf := m.formMessage(0, 0x00, append(length2Bytes(len(nameBytes)), nameBytes...))
+	_, err := m.conn.Write(buf)
+	return err
 }
 
 func (m *multiplexer) SendConnect(sessionId uint32, addr string) error {

@@ -147,7 +147,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 			err.Error())
 		return
 	}
-	log.Info("<%s> Listen on %s to redirect to %s:%d",
+	log.Info("<%s> Listen on %s to redirect to %s:%s",
 		n.cfg.GetInstanceName(),
 		pm.BindAddr, pm.RemoteNode, pm.RemoteAddr)
 	n.listeners = append(n.listeners, listener)

@@ -3,6 +3,7 @@ package multiplexer
 import (
 	"net"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -16,7 +17,7 @@ type channel struct {
 	loop         bool
 
 	pollMutex sync.Locker
-	polling bool
+	polling   bool
 }
 
 func (c *channel) Write(b []byte) (n int, err error) {
@@ -78,6 +79,7 @@ func (c *channel) Poll() error {
 			}
 		}
 	}()
+	i := 0
 	for c.loop {
 		b := make([]byte, 0xffff)
 		n, err := c.conn.Read(b)
@@ -88,6 +90,10 @@ func (c *channel) Poll() error {
 		_, err = c.Write(b)
 		if err != nil {
 			return errors.WithStack(err)
+		}
+		i = (i + 1) % 1000
+		if i == 0 {
+			time.Sleep(0)
 		}
 	}
 	return nil
