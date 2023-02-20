@@ -171,7 +171,7 @@ func (m *multiplexer) GetChannel(conn net.Conn) (ch Channel, err error) {
 		conn:         conn,
 		sessionId:    sessionId,
 		multiplexer:  m,
-		writeChannel: make(chan []byte, 256),
+		writeChannel: make(chan []byte, 10),
 		loop:         true,
 
 		polling:   false,
@@ -405,7 +405,7 @@ func (m *multiplexer) handleConnect(sessionId uint32, msg []byte) error {
 		conn:         conn,
 		sessionId:    sessionId,
 		multiplexer:  m,
-		writeChannel: make(chan []byte, 256),
+		writeChannel: make(chan []byte, 10),
 		loop:         true,
 
 		polling:   false,
