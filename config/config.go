@@ -283,6 +283,10 @@ func (cfg *Config) CreateKcpConnection(raddr string, laddr net.Addr) (udp *net.U
 	} else {
 		conn, err = kcp.NewConn(raddr, nil, 0, 0, udp)
 	}
+	c := conn.(*kcp.UDPSession)
+	c.SetStreamMode(true)
+	c.SetACKNoDelay(true)
+	c.SetNoDelay(1, 10, 2, 1)
 	return
 }
 
@@ -469,7 +473,7 @@ func (cfg *Config) getInt(section, key string, deft int) int {
 }
 
 func (cfg *Config) GetMakeholePacketNumber() int {
-	return cfg.getInt("connect", "makehole_packet_number", 1)
+	return cfg.getInt("connect", "makehole_packet_number", 5)
 }
 
 func (cfg *Config) GetMakeholePacketLength() int {

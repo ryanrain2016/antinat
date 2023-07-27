@@ -107,6 +107,7 @@ func (n *Node) ConnectionFactory(remoteName string) (net.Conn, error) {
 	log.Debug("<%s> the opposite node is behind <%s>", n.cfg.GetInstanceName(), raddr)
 	laddr := conn.LocalAddr()
 	np.Close()
+	time.Sleep(time.Second) // 停一秒让对面listen
 	log.Debug("<%s> start to connect to remote %s from %s", n.cfg.GetInstanceName(), raddr, laddr)
 	_, newConn, err := n.cfg.CreateKcpConnection(raddr, laddr)
 	if err != nil {
@@ -161,7 +162,7 @@ func (n *Node) handlePortMap(name string, pm *config.PortMap) {
 			// defer func() { conn.Close() }() // conn 的关闭交给channel了
 			multiplexer, err := n.MultiplexerManager.GetMultiplexer(pm.RemoteNode, 5)
 			if err != nil {
-				log.Error("<%s> connect to %s:%d error: %s",
+				log.Error("<%s> connect to %s:%s error: %s",
 					n.cfg.GetInstanceName(),
 					pm.RemoteNode, pm.RemoteAddr, err.Error())
 				return
