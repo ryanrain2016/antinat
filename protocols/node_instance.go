@@ -107,7 +107,7 @@ func (n *Node) ConnectionFactory(remoteName string) (net.Conn, error) {
 	log.Debug("<%s> the opposite node is behind <%s>", n.cfg.GetInstanceName(), raddr)
 	laddr := conn.LocalAddr()
 	np.Close()
-	time.Sleep(time.Second) // 停一秒让对面listen
+	//time.Sleep(time.Second) // 停一秒让对面listen
 	log.Debug("<%s> start to connect to remote %s from %s", n.cfg.GetInstanceName(), raddr, laddr)
 	_, newConn, err := n.cfg.CreateKcpConnection(raddr, laddr)
 	if err != nil {
