@@ -167,10 +167,10 @@ func (np *NodeProtocol) onConnection(buf []byte) (err error) {
 			}
 		}()
 		// defer lConn.Close()
+		np1.Close()
 		log.Debug("<%s> start listen on %s...",
 			np.cfg.GetInstanceName(),
 			localAddr)
-		np1.Close()
 		listener, err := np.cfg.CreateListener(localAddr)
 		if err != nil {
 			panic(err)
